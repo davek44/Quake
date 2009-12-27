@@ -1,0 +1,7 @@
+#include "pt_node.h"
+#include <cstring>
+
+pt_node::pt_node() {
+  for(int i = 0; i < 4; i++)
+    child[i] = NULL;
+}
