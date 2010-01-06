@@ -1,4 +1,5 @@
-#include "prefix_tree.h"
+//#include "prefix_tree.h"
+#include "bithash.h"
 #include "Read.h"
 #include <fstream>
 #include <iostream>
@@ -22,7 +23,7 @@ static int cutoff;
 // -l, read length
 static int read_len = 36;
 // -p, number of threads
-static int threads = 4;
+static int threads = 1;
 
 static void  Usage
     (char * command)
@@ -180,16 +181,18 @@ int main(int argc, char **argv) {
   int error_reads = 0;
   int fixed_reads = 0;
 
-  prefix_tree trusted;
+  //prefix_tree trusted;
+  bithash trusted;
   trusted.file_load(merf, cutoff);
 
+
   omp_set_num_threads(threads);
-  cout << omp_get_max_threads() << " threads" << endl;
+  //cout << omp_get_max_threads() << " threads" << endl;
 
 #pragma omp parallel //shared(trusted)
   {
     int tid = omp_get_thread_num();
-    cout << "Initializing thread " << tid << endl;
+    //cout << "Initializing thread " << tid << endl;
 
     char* toutf = strdup(outf);
     char strtid[10];
@@ -201,7 +204,7 @@ int main(int argc, char **argv) {
     reads_in.seekg(starts[tid]);
     
     string header,ntseq,strqual;
-    int iseq[read_len];
+    unsigned int iseq[read_len];
     char* nti;
     const char* nts = "ACGTN";
     Read *r;
@@ -234,7 +237,7 @@ int main(int argc, char **argv) {
       getline(reads_in,strqual);
       //cout << strqual << endl;
       
-      // save error reads
+      // fix error reads
       if(untrusted.size() > 0) {
 	r = new Read(header, &iseq[0], strqual, untrusted, read_len);
 	error_reads++;

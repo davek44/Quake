@@ -9,8 +9,8 @@ class prefix_tree {
  public:
   prefix_tree();
   ~prefix_tree();
-  void add(int kmer[k]);
-  bool check(int kmer[k]);
+  void add(unsigned int kmer[k]);
+  bool check(unsigned int kmer[k]);
   void file_load(const char* merf, const int boundary);
   int count_nodes();
  private:

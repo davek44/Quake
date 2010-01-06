@@ -26,13 +26,22 @@ def main():
         qual = fqf.readline().rstrip()
 
         if corrected.has_key(header):
-            if corrected[header] not in ['-','.']:
+            if corrected[header] not in ['-','.','+']:
+                # use corrected
                 print header
                 print corrected[header]
                 print '+'
                 print qual
 
+            elif corrected[header] == '+':
+                # use original
+                print header
+                print seq
+                print '+'
+                print qual                
+
         else:
+            # use original
             print header
             print seq
             print '+'

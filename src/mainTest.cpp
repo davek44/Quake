@@ -1,6 +1,7 @@
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
-#include "ReadTest.h"
+//#include "ReadTest.h"
+#include "bithashTest.h"
 
 int main( int argc, char **argv )
 {

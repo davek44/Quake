@@ -1,5 +1,6 @@
 #include "Read.h"
-#include "prefix_tree.h"
+//#include "prefix_tree.h"
+#include "bithash.h"
 #include <iostream>
 #include <math.h>
 #include <algorithm>
@@ -32,12 +33,12 @@ public:
 // Make shallow copies of sequence and untrusted, and
 // convert quality value string to array of probabilities
 ////////////////////////////////////////////////////////////
-Read::Read(const string & h, const int* s, const string & q, vector<int> & u, const int rl)
+Read::Read(const string & h, const unsigned int* s, const string & q, vector<int> & u, const int rl)
   :untrusted(u) {
 
   header = h;
   read_length = rl;
-  seq = new int[read_length];
+  seq = new unsigned int[read_length];
   prob = new float[read_length];
   for(int i = 0; i < read_length; i++) {
     seq[i] = s[i];    
@@ -60,7 +61,8 @@ Read::~Read() {
 // Find the set of corrections with maximum likelihood
 // that result in all trusted kmers
 ////////////////////////////////////////////////////////////
-bool Read::correct(prefix_tree *trusted, ofstream & out) {
+//bool Read::correct(prefix_tree *trusted, ofstream & out) {
+bool Read::correct(bithash *trusted, ofstream & out) {
   // determine region to consider
   vector<int> region = error_region();
 
@@ -74,7 +76,7 @@ bool Read::correct(prefix_tree *trusted, ofstream & out) {
   for(int i = 0; i < region.size(); i++)
     if(prob[region[i]] < .95)
       badnt += 1;
-
+  /*
   if(region.size() >= k && region.size() <= 1.5*k) {
     // mid region size
     float logpred = 27.5 - 25.3755*avgprob + .1965*badnt - 1.18*region.size() + .2672*avgprob*badnt + 1.297*avgprob*region.size();
@@ -90,6 +92,13 @@ bool Read::correct(prefix_tree *trusted, ofstream & out) {
       return false;
     }
   }
+  
+  // filter reads that look like low coverage
+  if(untrusted.size() > .95*(read_length-k+1) && avgprob > .98) {
+    out << header << "\t" << print_seq() << "\t+" << endl;
+    return false;
+  }
+  */
 
   // sort by quality
   quality_quicksort(region, 0, region.size()-1);
@@ -126,7 +135,8 @@ bool Read::correct(prefix_tree *trusted, ofstream & out) {
     if(cpq.size() > max_pq)
       max_pq = cpq.size();
     if(cpq.size() > 300000) {
-      //cout << "queue is too large for " << header << endl;
+      // debug
+      cout << "queue is too large for " << header << endl;
       if(trusted_read != 0) {
 	delete trusted_read;
 	trusted_read = 0;
@@ -169,8 +179,8 @@ v    }
 	  trusted_read = cr;
 	  trusted_likelihood = cr->likelihood;
 	} else {
-	  // output ambiguous corrections for testing
-	  //out << header << "\t" << print_seq() << "\t" << print_corrected(trusted_read) << "\t" << print_corrected(cr) << endl;
+	  // output ambiguous corrections for testing (debug)
+	  out << header << "\t" << print_seq() << "\t" << print_corrected(trusted_read) << "\t" << print_corrected(cr) << endl;
 
 	  // if yes, and if trusted read exists delete trusted_read, break loop
 	  delete trusted_read;
@@ -190,7 +200,7 @@ v    }
       for(int nt = 0; nt < 4; nt++) {
 	if(seq[edit_i] == nt) {
 	  // if no actual edit, copy over but move on to next edit
-	  next_cr = new corrected_read(cr->corrections, cr->untrusted, cr->likelihood, region_edit+1, true);	  
+	  next_cr = new corrected_read(cr->corrections, cr->untrusted, cr->likelihood, region_edit+1, true);
 	} else {
 	  // if actual edit, calculate new likelihood
 	  like = cr->likelihood * (1.0-prob[edit_i])/3.0 / prob[edit_i];
@@ -400,7 +410,8 @@ void Read::quality_quicksort(vector<int> & indexes, int left, int right) {
 // trusted kmers, update the corrected_reads's vector
 // of untrusted kmers and return true if it's now empty
 ////////////////////////////////////////////////////////////
-bool Read::check_trust(corrected_read *cr, prefix_tree *trusted) {
+//bool Read::check_trust(corrected_read *cr, prefix_tree *trusted) {
+bool Read::check_trust(corrected_read *cr, bithash *trusted) {
   // original read HAS errors
   if(cr->corrections.empty())
     return false;

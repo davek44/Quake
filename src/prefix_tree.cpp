@@ -18,7 +18,7 @@ prefix_tree::~prefix_tree() {
 //
 // Add a single sequence to the tree
 ////////////////////////////////////////////////////////////
-void prefix_tree::add(int kmer[k]) {
+void prefix_tree::add(unsigned int kmer[k]) {
   pt_node* current = root;
   for(int i = 0; i < k; i++) {
     if(current->child[kmer[i]] == NULL) {
@@ -33,7 +33,7 @@ void prefix_tree::add(int kmer[k]) {
 //
 // Check for the presence of a sequence in the tree
 ////////////////////////////////////////////////////////////
-bool prefix_tree::check(int kmer[k]) {
+bool prefix_tree::check(unsigned int kmer[k]) {
   pt_node* current = root;
   //cout << "check: ";
   for(int i = 0; i < k; i++) {
@@ -59,7 +59,7 @@ void prefix_tree::file_load(const char* merf, const int boundary) {
   ifstream mer_in(merf);
   string line;
   int count;
-  int seq[k];
+  unsigned int seq[k];
   int tmpseq[k];
   bool add_kmer = false;
 

@@ -38,7 +38,7 @@ bool prefix_tree::check(int kmer[k]) {
   //cout << "check: ";
   for(int i = 0; i < k; i++) {
     //cout << kmer[i] << " ";
-    if(current->child[kmer[i]] == NULL) {
+    if(kmer[i] >= 4 || current->child[kmer[i]] == NULL) {
       //cout << endl;
       return false;
     }

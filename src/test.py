@@ -8,7 +8,7 @@ import math, random, os, dna
 ############################################################
 
 like_t = .00001
-like_spread_t = .01
+like_spread_t = .1
 
 ############################################################
 # main
@@ -17,11 +17,11 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    err_profs = get_error_profiles(100000)
+    err_profs = get_error_profiles(10000)
 
     # make genome
     genome = ''
-    for i in range(100000):
+    for i in range(10000):
         genome += random.choice(['A','C','G','T'])
     gf = open('genome.fa','w')
     gf.write('>genome\n%s\n' % genome)
@@ -32,9 +32,10 @@ def main():
 
     # find trusted kmers
     trusted_kmers(genome)
-    exit()
+
     # run ./correct
     os.system('./correct -r err_reads.fq -m genome.cts -c 99')
+    os.system('cat out.txt? > out.txt')
 
     # compare corrected reads
     compare_corrections(err_reads, genome)

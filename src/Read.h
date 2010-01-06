@@ -1,7 +1,8 @@
 #ifndef READ_H
 #define READ_H
 
-#include "prefix_tree.h"
+//#include "prefix_tree.h"
+#include "bithash.h"
 #include <string>
 #include <vector>
 #include <fstream>
@@ -68,15 +69,17 @@ public:
 ////////////////////////////////////////////////////////////
 class Read {
  public:
-  Read(const string & h, const int* s, const string & q, vector<int> & u, const int read_length);
+  Read(const string & h, const unsigned int* s, const string & q, vector<int> & u, const int read_length);
   ~Read();
-  bool correct(prefix_tree* trusted, ofstream & out);
+  //bool correct(prefix_tree* trusted, ofstream & out);
+  bool correct(bithash* trusted, ofstream & out);
   vector<int> error_region();
-  bool check_trust(corrected_read *cr, prefix_tree *trusted);
+  //bool check_trust(corrected_read *cr, prefix_tree *trusted);
+  bool check_trust(corrected_read *cr, bithash *trusted);
 
   string header;
   int read_length;
-  int* seq;
+  unsigned int* seq;
   float* prob;
   vector<int> untrusted;
   corrected_read *trusted_read;
