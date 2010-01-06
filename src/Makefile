@@ -1,7 +1,7 @@
-CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
-#CC=g++
+#CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
+CC=g++
 CFLAGS=-g -fopenmp
-CPPUNIT_PATH = /fs/sz-user-supported/Linux-i686
+#CPPUNIT_PATH = /fs/sz-user-supported/Linux-i686
 
 #correct: correct.cpp Read.o prefix_tree.o pt_node.o
 #	$(CC) $(CFLAGS) correct.cpp Read.o prefix_tree.o pt_node.o -o correct

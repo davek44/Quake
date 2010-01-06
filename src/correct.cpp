@@ -5,8 +5,10 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <string.h>
 #include <getopt.h>
 #include <omp.h>
+#include <cstdlib>
 
 ////////////////////////////////////////////////////////////
 // options
@@ -206,7 +208,7 @@ int main(int argc, char **argv) {
     string header,ntseq,strqual;
     unsigned int iseq[read_len];
     char* nti;
-    const char* nts = "ACGTN";
+    char* nts = "ACGTN";
     Read *r;
 
     int tcount = 0;

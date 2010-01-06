@@ -8,6 +8,7 @@ using namespace::std;
 
 const int k = 15;
 const int bitssize = 1073741824;  // i.e. 4^k
+//const int bitssize = 67108864;  // i.e. 4^k
 
 class bithash {
  public:
