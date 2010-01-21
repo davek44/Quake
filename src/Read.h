@@ -3,6 +3,7 @@
 
 //#include "prefix_tree.h"
 #include "bithash.h"
+//#include "dawg.h"
 #include <string>
 #include <vector>
 #include <fstream>
@@ -16,15 +17,15 @@ using namespace::std;
 ////////////////////////////////////////////////////////////
 class correction {
 public:
-  correction(int i, int t) {
+  correction(short i, short t) {
     index = i;
     to = t;
   };
   // default copy constructor should suffice
 
-  int index;
+  short index;
   //int from;
-  int to;
+  short to;
 };
 
 ////////////////////////////////////////////////////////////
@@ -34,7 +35,7 @@ public:
 ////////////////////////////////////////////////////////////
 class corrected_read {
 public:
- corrected_read(vector<correction*> & c, vector<int> & u, float l, int re, bool ch)
+ corrected_read(vector<correction*> & c, vector<int> & u, float l, short re, bool ch)
     :untrusted(u) {
     likelihood = l;
     region_edits = re;
@@ -42,7 +43,7 @@ public:
     for(int i = 0; i < c.size(); i++)
       corrections.push_back(new correction(*c[i]));
   };
- corrected_read(vector<int> & u, float l, int re, bool ch)
+ corrected_read(vector<int> & u, float l, short re, bool ch)
     :untrusted(u) {
     likelihood = l;
     region_edits = re;
@@ -60,7 +61,7 @@ public:
   vector<correction*> corrections; 
   vector<int> untrusted; // inaccurate until pop'd off queue and processed
   float likelihood;
-  int region_edits;
+  short region_edits;
   bool checked;
 };
 
@@ -73,9 +74,11 @@ class Read {
   ~Read();
   //bool correct(prefix_tree* trusted, ofstream & out);
   bool correct(bithash* trusted, ofstream & out);
-  vector<int> error_region();
+  //bool correct(dawg * trusted, ofstream & out);
+  vector<short> error_region();
   //bool check_trust(corrected_read *cr, prefix_tree *trusted);
   bool check_trust(corrected_read *cr, bithash *trusted);
+  //bool check_trust(corrected_read *cr, dawg *trusted);
 
   string header;
   int read_length;
@@ -85,9 +88,9 @@ class Read {
   corrected_read *trusted_read;
 
  private:
-  bool untrusted_intersect(vector<int> & region);
-  void untrusted_union(vector<int> & region);
-  void quality_quicksort(vector<int> & indexes, int left, int right);
+  bool untrusted_intersect(vector<short> & region);
+  void untrusted_union(vector<short> & region);
+  void quality_quicksort(vector<short> & indexes, int left, int right);
   string print_seq();
   string print_corrected(corrected_read* cr);
 

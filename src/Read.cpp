@@ -1,11 +1,15 @@
 #include "Read.h"
 //#include "prefix_tree.h"
 #include "bithash.h"
+//#include "dawg.h"
 #include <iostream>
 #include <math.h>
 #include <algorithm>
 #include <set>
 #include <queue>
+
+#define TESTING false
+#define DEBUG false
 
 ////////////////////////////////////////////////////////////
 // corrections_compare
@@ -63,8 +67,9 @@ Read::~Read() {
 ////////////////////////////////////////////////////////////
 //bool Read::correct(prefix_tree *trusted, ofstream & out) {
 bool Read::correct(bithash *trusted, ofstream & out) {
+//bool Read::correct(dawg *trusted, ofstream & out) {
   // determine region to consider
-  vector<int> region = error_region();
+  vector<short> region = error_region();
 
   // filter really bad reads  
   float avgprob = 0;
@@ -76,29 +81,18 @@ bool Read::correct(bithash *trusted, ofstream & out) {
   for(int i = 0; i < region.size(); i++)
     if(prob[region[i]] < .95)
       badnt += 1;
-  /*
-  if(region.size() >= k && region.size() <= 1.5*k) {
-    // mid region size
-    float logpred = 27.5 - 25.3755*avgprob + .1965*badnt - 1.18*region.size() + .2672*avgprob*badnt + 1.297*avgprob*region.size();
-    if(exp(logpred) > 75000 || avgprob < .8 || badnt >= 8 || (avgprob < .9 &&  badnt == 7)) {
-      out << header << "\t" << print_seq() << "\t." << endl;
-      return false;
-    }
-  } else if(region.size() > 1.5*k) {
-    // large region size
-    float logpred = -29.5 + 74.03*avgprob + 1.658*badnt + .0691*region.size() - 40.95*avgprob*avgprob - .03*badnt*badnt - 1.281*avgprob*badnt + .01072*badnt*region.size();
-    if(exp(logpred) > 75000 || avgprob < .85 || badnt >= 8 || (avgprob < .92 &&  badnt == 7)) {
-      out << header << "\t" << print_seq() << "\t." << endl;
+
+  bool forfeit_easily = false;
+  if(!TESTING) {
+    if(badnt >= 8)
+      forfeit_easily = true;;
+
+    // filter reads that look like low coverage
+    if(untrusted.size() > .95*(read_length-k+1) && avgprob > .99) {
+      out << header << "\t" << print_seq() << "\t+" << endl;
       return false;
     }
   }
-  
-  // filter reads that look like low coverage
-  if(untrusted.size() > .95*(read_length-k+1) && avgprob > .98) {
-    out << header << "\t" << print_seq() << "\t+" << endl;
-    return false;
-  }
-  */
 
   // sort by quality
   quality_quicksort(region, 0, region.size()-1);
@@ -109,9 +103,9 @@ bool Read::correct(bithash *trusted, ofstream & out) {
 
   // add initial reads
   corrected_read *cr, *next_cr;
-  int edit_i = region[0];
+  short edit_i = region[0];
   float like;
-  for(int nt = 0; nt < 4; nt++) {
+  for(short nt = 0; nt < 4; nt++) {
     if(seq[edit_i] == nt) {
       next_cr = new corrected_read(untrusted, 1.0, 1, true);
     } else {
@@ -125,8 +119,10 @@ bool Read::correct(bithash *trusted, ofstream & out) {
   }
 
   // initialize likelihood parameters
+  bool quit_early = false;
   trusted_read = 0;
   float trusted_likelihood;
+  int untrusted_count;
 
   ////////////////////////////////////////
   // process corrected reads
@@ -134,8 +130,17 @@ bool Read::correct(bithash *trusted, ofstream & out) {
   while(cpq.size() > 0) {
     if(cpq.size() > max_pq)
       max_pq = cpq.size();
-    if(cpq.size() > 300000) {
-      // debug
+    
+    if(!TESTING) {
+      // give up on read if it was marked and no trusted reads have been found by 30k
+      if(forfeit_easily && trusted_read == 0 && cpq.size() > 30000) {
+	quit_early = true;
+	break;
+      }
+    }
+    
+    // give up on read if pq is too big
+    if(cpq.size() > 400000) {
       cout << "queue is too large for " << header << endl;
       if(trusted_read != 0) {
 	delete trusted_read;
@@ -147,17 +152,26 @@ bool Read::correct(bithash *trusted, ofstream & out) {
     cr = cpq.top();
     cpq.pop();
 
-    // print read
-    /*
-    printf("Queue size: %d\n",cpq.size());
-    printf("Region edit: %d\nCorrections:",cr->region_edits);
-    for(int i = 0; i < cr->corrections.size(); i++) {
-      printf("%d: %d, ", cr->corrections[i]->index, cr->corrections[i]->to);
-v    }
-    printf("\nLike: %f\n\n",cr->likelihood);
-    */
+    // print read  
+    if(DEBUG) {
+      if(header == "@8812") {
+	printf("\nQueue size: %d\n",cpq.size());
+	printf("Region edit: %d\nCorrections:",cr->region_edits);
+	for(int i = 0; i < cr->corrections.size(); i++) {
+	  printf("%d: %d, ", cr->corrections[i]->index, cr->corrections[i]->to);
+	}
+	printf("\n");
+	cout << print_corrected(cr) << endl;
+	printf("Like: %f\n",cr->likelihood);
+      } 
+    }
 
+    // save for later comparison
+    untrusted_count = (signed int)cr->untrusted.size();
+
+    // check trust only if unchecked
     if(!cr->checked) {
+
       if(trusted_read != 0) {
 	// if a corrected read exists, compare likelihoods and if likelihood is too low, break loop return true
 	if(cr->likelihood < trusted_likelihood*trust_spread_t) {
@@ -179,8 +193,9 @@ v    }
 	  trusted_read = cr;
 	  trusted_likelihood = cr->likelihood;
 	} else {
-	  // output ambiguous corrections for testing (debug)
-	  out << header << "\t" << print_seq() << "\t" << print_corrected(trusted_read) << "\t" << print_corrected(cr) << endl;
+	  // output ambiguous corrections for testing
+	  if(TESTING)
+	    out << header << "\t" << print_seq() << "\t" << print_corrected(trusted_read) << "\t" << print_corrected(cr) << endl;
 
 	  // if yes, and if trusted read exists delete trusted_read, break loop
 	  delete trusted_read;
@@ -191,38 +206,42 @@ v    }
       }
     }
     
-    // determine next nt flips
-    int region_edit = cr->region_edits;
-    if (region_edit < region.size()) {
-      edit_i = region[region_edit];
+    // if untrusted sharply increases, just bail
+    if(((signed int)cr->untrusted.size() - untrusted_count) < k/3) {    
 
-      // add relatives
-      for(int nt = 0; nt < 4; nt++) {
-	if(seq[edit_i] == nt) {
-	  // if no actual edit, copy over but move on to next edit
-	  next_cr = new corrected_read(cr->corrections, cr->untrusted, cr->likelihood, region_edit+1, true);
-	} else {
-	  // if actual edit, calculate new likelihood
-	  like = cr->likelihood * (1.0-prob[edit_i])/3.0 / prob[edit_i];
-
-	  // if thresholds ok, add new correction
-	  if(trusted_read != 0) {
-	    if(like < trusted_likelihood*trust_spread_t)
-	      continue;
+      // determine next nt flips
+      short region_edit = cr->region_edits;
+      if (region_edit < region.size()) {
+	edit_i = region[region_edit];
+	
+	// add relatives
+	for(short nt = 0; nt < 4; nt++) {
+	  if(seq[edit_i] == nt) {
+	    // if no actual edit, copy over but move on to next edit
+	    next_cr = new corrected_read(cr->corrections, cr->untrusted, cr->likelihood, region_edit+1, true);
 	  } else {
-	    // must consider spread or risk missing a case of ambiguity
-	    if(like < correct_min_t*trust_spread_t)
-	      continue;
+	    // if actual edit, calculate new likelihood
+	    like = cr->likelihood * (1.0-prob[edit_i])/3.0 / prob[edit_i];
+	    
+	    // if thresholds ok, add new correction
+	    if(trusted_read != 0) {
+	      if(like < trusted_likelihood*trust_spread_t)
+		continue;
+	    } else {
+	      // must consider spread or risk missing a case of ambiguity
+	      if(like < correct_min_t*trust_spread_t)
+		continue;
+	    }
+	    
+	    next_cr = new corrected_read(cr->corrections, cr->untrusted, like, region_edit+1, false);
+	    next_cr->corrections.push_back(new correction(edit_i, nt));
 	  }
 	  
-	  next_cr = new corrected_read(cr->corrections, cr->untrusted, like, region_edit+1, false);
-	  next_cr->corrections.push_back(new correction(edit_i, nt));
+	  // add to priority queue
+	  cpq.push(next_cr);
 	}
-
-	// add to priority queue
-	cpq.push(next_cr);
       }
-    }
+    }	  
 
     // if not the saved max trusted, delete
     if(trusted_read != cr) {
@@ -239,16 +258,21 @@ v    }
     delete cr;
   }
   
-  int t = 0;
-  if(trusted_read != 0)
-    t = 1;  
+  //int t = 0;
+  //if(trusted_read != 0)
+  //  t = 1;  
   //cout << header << "\t" << max_pq << "\t" << avgprob << "\t" << badnt << "\t" << region.size() << "\t" << t << endl;
 
   if(trusted_read != 0) {
     out << header << "\t" << print_seq() << "\t" << print_corrected(trusted_read) << endl;
     return true;
-  } else {
-    out << header << "\t" << print_seq() << "\t-" << endl;
+  } else {    
+    if(!TESTING) {
+      if(quit_early)
+	out << header << "\t" << print_seq() << "\t." << endl;
+      else
+	out << header << "\t" << print_seq() << "\t-" << endl;
+    }
     return false;
   }
 }
@@ -292,24 +316,24 @@ string Read::print_corrected(corrected_read* cr) {
 // Find region of the read to consider for errors based
 // on the pattern of untrusted kmers
 ////////////////////////////////////////////////////////////
-vector<int> Read::error_region() {
+vector<short> Read::error_region() {
   // find read indexes to consider
-  vector<int> region;
+  vector<short> region;
   if(untrusted_intersect(region)) {
     // if front kmers can reach region, there may be more
     // errors in the front
 
-    int f = region.front();
-    int b = region.back();
+    short f = region.front();
+    short b = region.back();
 
     if(k-1 >= f) {
       // extend to front
-      for(int i = f-1; i >= 0; i--)
+      for(short i = f-1; i >= 0; i--)
 	region.push_back(i);
     }
     if(read_length-k <= b) {
       // extend to back
-      for(int i = b+1; i < read_length; i++)
+      for(short i = b+1; i < read_length; i++)
 	region.push_back(i);
     }
   } else
@@ -325,7 +349,7 @@ vector<int> Read::error_region() {
 // start,end return true if it's non-empty or false
 // otherwise
 ////////////////////////////////////////////////////////////
-bool Read::untrusted_intersect(vector<int> & region) {
+bool Read::untrusted_intersect(vector<short> & region) {
   int start = 0;
   int end = read_length-1;
 
@@ -345,7 +369,7 @@ bool Read::untrusted_intersect(vector<int> & region) {
   }
     
   // intersection is non-empty
-  for(int i = start; i <= end; i++)
+  for(short i = start; i <= end; i++)
     region.push_back(i);
   return true;
 }
@@ -355,17 +379,17 @@ bool Read::untrusted_intersect(vector<int> & region) {
 //
 // Compute the union of the untrusted kmers, though not
 ////////////////////////////////////////////////////////////
-void Read::untrusted_union(vector<int> & region) {
-  int u;
-  set<int> region_set;
+void Read::untrusted_union(vector<short> & region) {
+  short u;
+  set<short> region_set;
   for(int i = 0; i < untrusted.size(); i++) {
     u = untrusted[i];
 
-    for(int ui = u; ui < u+k; ui++)
+    for(short ui = u; ui < u+k; ui++)
       region_set.insert(ui);
   }
 
-  set<int>::iterator it;
+  set<short>::iterator it;
   for(it = region_set.begin(); it != region_set.end(); it++)
     region.push_back(*it);      
 }
@@ -376,9 +400,9 @@ void Read::untrusted_union(vector<int> & region) {
 // Sort the indexes from lowest probability of an accurate
 // basecall to highest
 ////////////////////////////////////////////////////////////
-void Read::quality_quicksort(vector<int> & indexes, int left, int right) {
+void Read::quality_quicksort(vector<short> & indexes, int left, int right) {
   int i = left, j = right;  
-  int tmp;
+  short tmp;
   float pivot = prob[indexes[(left + right) / 2]];
  
   /* partition */
@@ -412,6 +436,7 @@ void Read::quality_quicksort(vector<int> & indexes, int left, int right) {
 ////////////////////////////////////////////////////////////
 //bool Read::check_trust(corrected_read *cr, prefix_tree *trusted) {
 bool Read::check_trust(corrected_read *cr, bithash *trusted) {
+//bool Read::check_trust(corrected_read *cr, dawg *trusted) {
   // original read HAS errors
   if(cr->corrections.empty())
     return false;
@@ -434,18 +459,46 @@ bool Read::check_trust(corrected_read *cr, bithash *trusted) {
 
   // add untrusted kmers before edit
   i = 0;
+  //vector<int> old_untrusted;
   while(i < untrusted_save.size() && untrusted_save[i] < kmer_start) {
     cr->untrusted.push_back(untrusted_save[i]);
+    //old_untrusted.push_back(untrusted_save[i]);
     i++;
   }
 
   // check affected kmers  
+  /*
   for(i = kmer_start; i <= kmer_end; i++) {
     // check kmer
     if(!trusted->check(&seq[i]))
       cr->untrusted.push_back(i);
+      //old_untrusted.push_back(i);
   }
-  
+  */ 
+
+  long long unsigned kmermap;
+  // check first kmer and save map value
+  if(!trusted->check(&seq[kmer_start], kmermap))
+    cr->untrusted.push_back(kmer_start);
+  for(i = kmer_start+1; i <= kmer_end; i++) {
+    // check kmer using map value
+    if(!trusted->check(kmermap, seq[i-1], seq[i+k-1]))
+      cr->untrusted.push_back(i);
+  }
+
+  // compare new way and old way
+  /*
+  if(cr->untrusted != old_untrusted) {
+    cout << "different" << endl;
+    for(int i = 0; i < old_untrusted.size(); i++)
+      cout << old_untrusted[i] << " ";
+    cout << endl;
+    for(int i = 0; i < cr->untrusted.size(); i++)
+      cout << cr->untrusted[i] << " ";
+    cout << endl;
+  }
+  */
+
   // add untrusted kmers after edit
   for(i = 0; i < untrusted_save.size(); i++) {
     if(untrusted_save[i] > kmer_end)

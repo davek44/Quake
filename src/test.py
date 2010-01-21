@@ -17,11 +17,13 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    err_profs = get_error_profiles(10000)
+    num_reads = 50000
+    err_profs = get_error_profiles(num_reads)
 
     # make genome
     genome = ''
-    for i in range(10000):
+    genome_size = 100000
+    for i in range(genome_size):
         genome += random.choice(['A','C','G','T'])
     gf = open('genome.fa','w')
     gf.write('>genome\n%s\n' % genome)
@@ -34,7 +36,7 @@ def main():
     trusted_kmers(genome)
 
     # run ./correct
-    os.system('./correct -r err_reads.fq -m genome.cts -c 99')
+    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99')
     os.system('cat out.txt? > out.txt')
 
     # compare corrected reads
@@ -111,7 +113,8 @@ def simulate_error_reads(genome, err_profs):
 def trusted_kmers(genome):
     tkout = open('genome.cts','w')
     for i in range(len(genome)-15):
-        print >> tkout, '>100\n%s' % genome[i:i+15]
+        #print >> tkout, '>100\n%s' % genome[i:i+15]
+        print >> tkout, '%s\t100' % genome[i:i+15]
     tkout.close()
 
 ############################################################
@@ -142,7 +145,7 @@ def compare_corrections(err_reads, genome):
                 else:
                     print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], rlike)
 
-            else:
+            elif a[2] != '-':
                 if(not check_trust(a[2], genome)):
                     print 'correction should have failed due to lack of trust %s %s %s' % (a[0], a[1], a[2])
 

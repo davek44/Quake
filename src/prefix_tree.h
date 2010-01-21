@@ -1,7 +1,7 @@
 #ifndef PREFIX_TREE_H
 #define PREFIX_TREE_H
 
-#include "pt_node.h"
+#include "node.h"
 
 const int k = 15;
 
@@ -14,8 +14,8 @@ class prefix_tree {
   void file_load(const char* merf, const int boundary);
   int count_nodes();
  private:
-  int count_nodes_recurse(pt_node* current);
-  pt_node* root;
+  int count_nodes_recurse(node* current);
+  node* root;
 };
 
 #endif

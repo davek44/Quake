@@ -1,5 +1,6 @@
 //#include "prefix_tree.h"
 #include "bithash.h"
+//#include "dawg.h"
 #include "Read.h"
 #include <fstream>
 #include <iostream>
@@ -177,16 +178,16 @@ int main(int argc, char **argv) {
   vector<int> starts;
   vector<int> counts;
   pa_params(starts, counts);
-  for(int i = 0; i < threads; i++)
-    cout << counts[i] << " " << starts[i] << endl;
+  //for(int i = 0; i < threads; i++)
+  //  cout << counts[i] << " " << starts[i] << endl;
 
   int error_reads = 0;
   int fixed_reads = 0;
 
-  //prefix_tree trusted;
-  bithash trusted;
-  trusted.file_load(merf, cutoff);
-
+  //prefix_tree *trusted = new prefix_tree;
+  bithash *trusted = new bithash();
+  //dawg *trusted = new dawg();
+  trusted->tab_file_load(merf, cutoff);
 
   omp_set_num_threads(threads);
   //cout << omp_get_max_threads() << " threads" << endl;
@@ -208,7 +209,7 @@ int main(int argc, char **argv) {
     string header,ntseq,strqual;
     unsigned int iseq[read_len];
     char* nti;
-    char* nts = "ACGTN";
+    const char* nts = "ACGTN";
     Read *r;
 
     int tcount = 0;
@@ -228,7 +229,7 @@ int main(int argc, char **argv) {
       // find untrusted kmers
       vector<int> untrusted;
       for(int i = 0; i < read_len-k+1; i++) {
-	if(!trusted.check(&iseq[i])) {
+	if(!trusted->check(&iseq[i])) {
 	  untrusted.push_back(i);
 	}
       }
@@ -243,7 +244,7 @@ int main(int argc, char **argv) {
       if(untrusted.size() > 0) {
 	r = new Read(header, &iseq[0], strqual, untrusted, read_len);
 	error_reads++;
-	if(r->correct(&trusted, reads_out))
+	if(r->correct(trusted, reads_out))
 	  fixed_reads++;
 	delete r;
       }

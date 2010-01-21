@@ -1,12 +1,13 @@
-#CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
-CC=g++
+CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
 CFLAGS=-g -fopenmp
-#CPPUNIT_PATH = /fs/sz-user-supported/Linux-i686
+CPPUNIT_PATH = /fs/sz-user-supported/Linux-x86_64
 
-#correct: correct.cpp Read.o prefix_tree.o pt_node.o
-#	$(CC) $(CFLAGS) correct.cpp Read.o prefix_tree.o pt_node.o -o correct
+#correct: correct.cpp Read.o prefix_tree.o node.o
+#	$(CC) $(CFLAGS) correct.cpp Read.o prefix_tree.o node.o -o correct
 correct: correct.cpp Read.o bithash.o
 	$(CC) $(CFLAGS) correct.cpp Read.o bithash.o -o correct
+#correct: correct.cpp Read.o dawg.o node.o
+#	$(CC) $(CFLAGS) correct.cpp Read.o dawg.o node.o -o correct
 
 Read.o: Read.cpp Read.h
 	$(CC) $(CFLAGS) -c Read.cpp
@@ -14,15 +15,18 @@ Read.o: Read.cpp Read.h
 #prefix_tree.o: prefix_tree.cpp prefix_tree.h
 #	$(CC) $(CFLAGS) -c prefix_tree.cpp
 
-#pt_node.o: pt_node.cpp pt_node.h
-#	$(CC) $(CFLAGS) -c pt_node.cpp
-
 bithash.o: bithash.cpp bithash.h
 	$(CC) $(CFLAGS) -c bithash.cpp
 
-test:
-#	$(CC) $(CFLAGS) -I${CPPUNIT_PATH}/include -L${CPPUNIT_PATH}/lib -lcppunit -ldl mainTest.cpp ReadTest.cpp Read.cpp prefix_tree.cpp pt_node.cpp -o test
-	$(CC) $(CFLAGS) -I${CPPUNIT_PATH}/include -L${CPPUNIT_PATH}/lib -lcppunit -ldl mainTest.cpp bithashTest.cpp bithash.cpp -o test
+#dawg.o: dawg.cpp dawg.h
+#	$(CC) $(CFLAGS) -c dawg.cpp
+
+#node.o: node.cpp node.h
+#	$(CC) $(CFLAGS) -c node.cpp
+
+#test: bithash.cpp bithash.h mainTest.cpp bithashTest.cpp bithashTest.h
+#	$(CC) $(CFLAGS) -I${CPPUNIT_PATH}/include -L${CPPUNIT_PATH}/lib -lcppunit -ldl mainTest.cpp ReadTest.cpp Read.cpp prefix_tree.cpp node.cpp -o test
+#	$(CC) $(CFLAGS) -I${CPPUNIT_PATH}/include -L${CPPUNIT_PATH}/lib -lcppunit -ldl mainTest.cpp bithashTest.cpp bithash.cpp -o test
 
 clean:
 	rm correct test *.o

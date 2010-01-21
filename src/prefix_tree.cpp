@@ -6,7 +6,7 @@
 using namespace::std;
 
 prefix_tree::prefix_tree() {
-  root = new pt_node();
+  root = new node();
 }
 
 prefix_tree::~prefix_tree() {
@@ -19,10 +19,10 @@ prefix_tree::~prefix_tree() {
 // Add a single sequence to the tree
 ////////////////////////////////////////////////////////////
 void prefix_tree::add(unsigned int kmer[k]) {
-  pt_node* current = root;
+  node* current = root;
   for(int i = 0; i < k; i++) {
     if(current->child[kmer[i]] == NULL) {
-      current->child[kmer[i]] = new pt_node();
+      current->child[kmer[i]] = new node();
     }
     current = current->child[kmer[i]];
   }
@@ -34,7 +34,7 @@ void prefix_tree::add(unsigned int kmer[k]) {
 // Check for the presence of a sequence in the tree
 ////////////////////////////////////////////////////////////
 bool prefix_tree::check(unsigned int kmer[k]) {
-  pt_node* current = root;
+  node* current = root;
   //cout << "check: ";
   for(int i = 0; i < k; i++) {
     //cout << kmer[i] << " ";
@@ -104,7 +104,7 @@ int prefix_tree::count_nodes() {
   return count_nodes_recurse(root);
 }
 
-int prefix_tree::count_nodes_recurse(pt_node* current) {
+int prefix_tree::count_nodes_recurse(node* current) {
   int count = 1;
   for(int nt = 0; nt < 4; nt++) {
     if(current->child[nt] != NULL) {

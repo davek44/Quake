@@ -84,7 +84,7 @@ bool bithash::check(unsigned long long & kmermap, unsigned last, unsigned next) 
 // Make a prefix_tree from kmers in the file given that
 // occur >= "boundary" times
 ////////////////////////////////////////////////////////////
-void bithash::file_load(const char* merf, const int boundary) {
+void bithash::meryl_file_load(const char* merf, const int boundary) {
   ifstream mer_in(merf);
   string line;
   int count;
@@ -109,6 +109,36 @@ void bithash::file_load(const char* merf, const int boundary) {
 
       // add reverse to tree
       add(binary_rckmer(line));
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////
+// file_load
+//
+// Make a prefix_tree from kmers in the file given that
+// occur >= "boundary" times
+////////////////////////////////////////////////////////////
+void bithash::tab_file_load(const char* merf, const int boundary) {
+  ifstream mer_in(merf);
+  string line;
+  int count;
+
+  while(getline(mer_in, line)) {
+    if(line[k] != '\t')
+      cout << "Kmers are not of expected length " << k << endl;
+
+    // get count
+    count = atoi(line.substr(k+1).c_str());
+    //cout << count << endl;
+      
+    // compare to boundary
+    if(count >= boundary) {
+      // add to tree
+      add(binary_kmer(line.substr(0,k)));
+
+      // add reverse to tree
+      add(binary_rckmer(line.substr(0,k)));
     }
   }
 }
