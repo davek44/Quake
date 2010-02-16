@@ -277,7 +277,7 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
     unsigned int iseq[read_len];
     char* nti;
     Read *r;
-    correction* cor;
+    //correction* cor;
 
     int tcount = 0;
     while(getline(reads_in, header)) {
@@ -317,10 +317,10 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
 	r = new Read(header, &iseq[0], strqual, untrusted, read_len);
 	if(r->multi_correct(trusted, reads_out, ntnt_prob, false)) {
 	  for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
-	    cor = r->trusted_read->corrections[c];
-	    if(iseq[cor->index] < 4) {
+	    correction cor = r->trusted_read->corrections[c];
+	    if(iseq[cor.index] < 4) {
 	      // real -> observed, (real approximated by correction)
-	      ntnt_counts[cor->to][iseq[cor->index]]++;
+	      ntnt_counts[cor.to][iseq[cor.index]]++;
 	      //ntnt_counts[iseq[cor->index]][cor->to]++;
 	      samples++;
 	    }

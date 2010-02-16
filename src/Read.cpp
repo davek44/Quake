@@ -7,7 +7,7 @@
 #include <queue>
 
 #define TESTING true
-#define DEBUG true
+#define DEBUG false
 
 ////////////////////////////////////////////////////////////
 // corrections_compare
@@ -127,7 +127,10 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
   quality_quicksort(region, 0, region.size()-1);
 
   // data structure for corrected_reads sorted by likelihood
-  priority_queue< corrected_read*, vector<corrected_read*>, corrections_compare > cpq;
+  //priority_queue< corrected_read*, vector<corrected_read*>, corrections_compare > cpq;
+  vector<corrected_read*> cpq;
+  corrections_compare cpq_comp;
+
   int max_pq = 0;
 
   // add initial reads
@@ -149,10 +152,13 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
 	like = (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
 	
 	next_cr = new corrected_read(bituntrusted, like, region_edit+1);
-	next_cr->corrections.push_back(new correction(edit_i, nt));
+	//next_cr->corrections.push_back(new correction(edit_i, nt));
+	next_cr->corrections.push_back(correction(edit_i, nt));
       
 	// add to priority queue
-	cpq.push(next_cr);
+	//cpq.push(next_cr);
+	cpq.push_back(next_cr);
+	push_heap(cpq.begin(), cpq.end(), cpq_comp);
 	cr_added = true;
       }
     }
@@ -192,8 +198,11 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
       break;
     }
 
-    cr = cpq.top();
-    cpq.pop();
+    //cr = cpq.top();
+    cr = cpq[0];
+    //cpq.pop();
+    pop_heap(cpq.begin(), cpq.end(), cpq_comp);
+    cpq.pop_back();
 
     // print read  
     if(DEBUG) {
@@ -201,7 +210,7 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
 	printf("\nQueue size: %d\n",cpq.size());
 	printf("Region edit: %d\nCorrections:",cr->region_edits);
 	for(int i = 0; i < cr->corrections.size(); i++) {
-	  printf("%d: %d, ", cr->corrections[i]->index, cr->corrections[i]->to);
+	  printf("%d: %d, ", cr->corrections[i].index, cr->corrections[i].to);
 	}
 	printf("\n");
 	cout << print_corrected(cr->corrections) << endl;
@@ -274,10 +283,12 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
 	    }
 	    
 	    next_cr = new corrected_read(cr->corrections, cr->untrusted, like, region_edit+1);
-	    next_cr->corrections.push_back(new correction(edit_i, nt));
+	    next_cr->corrections.push_back(correction(edit_i, nt));
 	  
 	    // add to priority queue
-	    cpq.push(next_cr);
+	    //cpq.push(next_cr);
+	    cpq.push_back(next_cr);
+	    push_heap(cpq.begin(), cpq.end(), cpq_comp);
 	    cr_added = true;
 	  }
 	}
@@ -290,13 +301,18 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
     }
   }
 
-  // delete memory from rpq
+  // delete memory from cpq
+  /*
   while(cpq.size() > 0) {
     cr = cpq.top();
     cpq.pop();
     delete cr;
   }
-  
+  */
+
+  for(int i = 0; i < cpq.size(); i++)
+    delete cpq[i];
+
   //int t = 0;
   //if(trusted_read != 0)
   //  t = 1;  
@@ -328,18 +344,18 @@ string Read::print_seq() {
 ////////////////////////////////////////////////////////////
 // print_corrected
 ////////////////////////////////////////////////////////////
-string Read::print_corrected(vector<correction*> & cor) {
+string Read::print_corrected(vector<correction> & cor) {
   char nts[5] = {'A','C','G','T','N'};
   string sseq;
   int correct_i;
   for(int i = 0; i < read_length; i++) {
     correct_i = -1;
     for(int c = 0; c < cor.size(); c++) {
-      if(cor[c]->index == i)
+      if(cor[c].index == i)
 	correct_i = c;
     }
     if(correct_i != -1)
-      sseq.push_back(nts[cor[correct_i]->to]);
+      sseq.push_back(nts[cor[correct_i].to]);
     else
       sseq.push_back(nts[seq[i]]);
   }
@@ -359,7 +375,7 @@ bool Read::multi_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4
   vector<int> cc_untrusted;
   cc_untrusted.push_back(untrusted[0]);
   // 
-  vector<correction*> multi_cors;
+  vector<correction> multi_cors;
   for(int i = 1; i < untrusted.size(); i++) {
 
     // if kmer from last untrusted doesn't reach next
@@ -537,11 +553,11 @@ bool Read::check_trust(corrected_read *cr, bithash *trusted) {
   vector<int> seqsave;
   int i;
   for(i = 0; i < cr->corrections.size(); i++) {
-    seqsave.push_back(seq[cr->corrections[i]->index]);
-    seq[cr->corrections[i]->index] = cr->corrections[i]->to;
+    seqsave.push_back(seq[cr->corrections[i].index]);
+    seq[cr->corrections[i].index] = cr->corrections[i].to;
   }
 
-  int edit = cr->corrections.back()->index;
+  int edit = cr->corrections.back().index;
   int kmer_start = max(0, edit-k+1);
   int kmer_end = min(edit, read_length-k);
 
@@ -566,7 +582,7 @@ bool Read::check_trust(corrected_read *cr, bithash *trusted) {
 
   // fix sequence
   for(i = 0; i < cr->corrections.size(); i++)
-    seq[cr->corrections[i]->index] = seqsave[i];
+    seq[cr->corrections[i].index] = seqsave[i];
 
   return(cr->untrusted.none());
 }
