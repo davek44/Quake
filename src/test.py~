@@ -8,7 +8,7 @@ import math, random, os, dna
 ############################################################
 
 like_t = .00001
-like_spread_t = .01
+like_spread_t = .1
 
 ############################################################
 # main
@@ -17,11 +17,13 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    err_profs = get_error_profiles(10000)
+    num_reads = 25000
+    err_profs = get_error_profiles(num_reads)
 
     # make genome
     genome = ''
-    for i in range(100000):
+    genome_size = 100000
+    for i in range(genome_size):
         genome += random.choice(['A','C','G','T'])
     gf = open('genome.fa','w')
     gf.write('>genome\n%s\n' % genome)
@@ -34,7 +36,8 @@ def main():
     trusted_kmers(genome)
 
     # run ./correct
-    os.system('./correct -r err_reads.fq -m genome.cts -c 99')
+    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99')
+    os.system('cat out.txt? > out.txt')
 
     # compare corrected reads
     compare_corrections(err_reads, genome)
@@ -110,7 +113,8 @@ def simulate_error_reads(genome, err_profs):
 def trusted_kmers(genome):
     tkout = open('genome.cts','w')
     for i in range(len(genome)-15):
-        print >> tkout, '>100\n%s' % genome[i:i+15]
+        #print >> tkout, '>100\n%s' % genome[i:i+15]
+        print >> tkout, '%s\t100' % genome[i:i+15]
     tkout.close()
 
 ############################################################
@@ -124,6 +128,7 @@ def compare_corrections(err_reads, genome):
     right_wrong_correction = 0
     right_ambiguous = 0
     right_threshold = 0
+    correctable_abstained = 0
     
     for line in open('out.txt'):
         a = line.split()
@@ -141,7 +146,22 @@ def compare_corrections(err_reads, genome):
                 else:
                     print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], rlike)
 
+            elif a[2] == '-':
+                # no correction found
+                rlike = likelihood(er['orig'], er['err'], er['qual'])
+                if rlike > like_t:
+                    print 'correction should have been made: %s %s %s %s %f' % (a[0],er['orig'],er['err'],er['qual'],rlike)
+                else:
+                    right_threshold += 1
+
+            elif a[2] == '.':
+                # read too crappy to bother
+                rlike = likelihood(er['orig'], er['err'], er['qual'])
+                if rlike > like_t:
+                    correctable_abstained += 1
+
             else:
+                # corrected improperly
                 if(not check_trust(a[2], genome)):
                     print 'correction should have failed due to lack of trust %s %s %s' % (a[0], a[1], a[2])
 
@@ -157,7 +177,8 @@ def compare_corrections(err_reads, genome):
                     print 'correction should have failed due to ambiguity: %s %s %s %s %f %f' % (a[0], er['orig'], er['err'], er['qual'], rlike, clike)
 
                 elif clike < like_t:
-                    print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)            
+                    print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)
+                
 
         elif len(a) == 4:
             # ambiguous read
@@ -171,22 +192,12 @@ def compare_corrections(err_reads, genome):
 
         del err_reads[a[0]]
 
-    ########################################
-    # check uncorrected reads
-    ########################################
-    for header in err_reads:
-        er = err_reads[header]
-        
-        rlike = likelihood(er['orig'], er['err'], er['qual'])
-        if rlike > like_t:
-            print 'correction should have been made: %s %s %s %s %f' % (header,er['orig'],er['err'],er['qual'],rlike)
-        else:
-            right_threshold += 1
 
     print 'Right correction: %d' % right_correction
     print 'Optimal but incorrect correction: %d' % right_wrong_correction
     print 'Optimal ambiguity restraint in not correcting: %d' % right_ambiguous
     print 'Optimal threshold restraint in not correcting: %d' % right_threshold
+    print 'Gave up, but read was correctable over threshold: %d' % correctable_abstained
 
 
 ############################################################

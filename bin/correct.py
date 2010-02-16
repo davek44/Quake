@@ -1,6 +1,6 @@
 #!/fs/sz-user-supported/Linux-i686/bin/python2.5
 from optparse import OptionParser
-import os
+import os, random
 
 ############################################################
 # correct.py
@@ -8,6 +8,7 @@ import os
 # Launch pipeline to correct errors in sequencing reads.
 ############################################################
 
+r_dir = '/nfshomes/dakelley/research/error_correction/bin'
 
 ############################################################
 # main
@@ -17,6 +18,8 @@ def main():
     
     parser.add_option('-r', dest='readsf', help='Fastq file of reads')
     parser.add_option('-k', dest='k', type='int', help='Size of k-mers to correct')
+    parser.add_option('-p', dest='proc', type='int', help='Number of processes')
+    parser.add_option('-l', dest='read_len', type='int', help='Read length')
 
     (options, args) = parser.parse_args()
 
@@ -25,64 +28,57 @@ def main():
     if not options.k:
         parser.error('Must provide k-mer size with -k')
 
-    kmerf = os.path.splitext( os.path.split(options.readsf)[1] )[0]
+    ctsf = '%s.cts' % os.path.splitext( os.path.split(options.readsf)[1] )[0]
+    #count_kmers_meryl(options.readsf, options.k, ctsf)
+    count_kmers_amos(options.readsf, options.k, ctsf)
+
+    # sample kmer coverages
+    covs = []
+    for line in open(ctsf):
+        covs.append(int(line.split()[1]))
+
+    cov_out = open('kmers.txt','w')
+    print >> cov_out, '\n'.join([str(x) for x in random.sample(covs,10000)])
+    cov_out.close()
+
+    # model coverage
+    os.system('R --slave < %s/kmer_model.r > cutoff.txt' % r_dir)
+    cutoff = int(open('cutoff.txt').readline())
+
+    # run correct C++ code
+    os.system('correct -r %s -m %s -c %d -t %d -l %d' % (options.readsf, ctsf, cutoff, options.proc, options.read_len))
+
+    os.system('cat out.txt?* > out.txt')
+    os.system('rm out.txt?*')
+
+
+############################################################
+# count_kmers_meryl
+#
+# Count kmers in the reads file using Meryl
+############################################################
+def count_kmers_meryl(readsf, k, ctsf):
 
     # pull out sequence
-    os.system('formats.py --fq2fa %s > %s.fa' % (options.readsf, kmerf))
+    os.system('formats.py --fq2fa %s > %s.fa' % (readsf, ctsf[:-4]))
     
     # count mers
-    os.system('meryl -B -C -m %d -s %s.fa -o %s' % (options.k, kmerf, kmerf))
+    os.system('meryl -B -C -m %d -s %s.fa -o %s' % (k, ctsf[:-4], ctsf[:-4]))
     # print histogram of counts
-    os.system('meryl -Dh -s %s > %s.hist' % (kmerf,kmerf))
+    #os.system('meryl -Dh -s %s > %s.hist' % (kmerf,kmerf))
     # print counts
-    os.system('meryl -Dt -n 1 -s %s > %s.cts' % (kmerf,kmerf))
-
-    # find trust/untrust boundary
-    boundary = find_boundary(kmerf)
-
-    print boundary
+    os.system('meryl -Dt -n 1 -s %s > %s' % (ctsf[:-4],ctsf))
     
 
 ############################################################
-# find_boundary
+# count_kmers_amos
 #
-# Find a good boundary between trusted and untrusted kmers
-# by examining the histogram for the smallest value before
-# the peak at the expected coverage
+# Count kmers in the reads file using AMOS count-kmers
 ############################################################
-def find_boundary(kmerf):
-    last_hist = 0
-    increases = 0
+def count_kmers_amos(readsf, k, ctsf):
+    kmerf = os.path.splitext( os.path.split(readsf)[1] )[0]
+    os.system('cat %s | count-kmers -k %d -S > %s' % (readsf, k, ctsf))
     
-    min_ct = 0
-    min_hist = 0
-    
-    for line in open(kmerf+'.hist'):
-        a = line.split()
-
-        # init, or lesser
-        if min_ct == 0 or int(a[1]) < min_hist:
-            min_ct = int(a[0])
-            min_hist = int(a[1])
-
-        # assess upward trend
-        if int(a[1]) > last_hist:
-            increases += 1
-        else:
-            increases = 0
-            
-        if increases >= 3:
-            break
-
-        last_hist = int(a[1])
-
-    if increases != 3:
-        print 'WARNING: Error and expected coverage peaks blurred. Boundary is %d' % min_ct
-
-    return min_ct
-
-        
-
             
 ############################################################
 # __main__

@@ -1,5 +1,5 @@
 CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
-CFLAGS=-g -fopenmp
+CFLAGS=-g -O3 -fopenmp
 CPPUNIT_PATH = /fs/sz-user-supported/Linux-x86_64
 
 #correct: correct.cpp Read.o prefix_tree.o node.o

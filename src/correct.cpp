@@ -10,11 +10,12 @@
 #include <getopt.h>
 #include <omp.h>
 #include <cstdlib>
+#include <iomanip>
 
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:m:oc:l";
+const static char* myopts = "r:m:o:c:l:t:";
 // -r, fastq file of reads
 static char* fastqf = NULL;
 // -m, mer counts
@@ -26,7 +27,10 @@ static int cutoff;
 // -l, read length
 static int read_len = 36;
 // -p, number of threads
-static int threads = 1;
+static int threads = 4;
+
+// constants
+static const char* nts = "ACGTN";
 
 static void  Usage
     (char * command)
@@ -107,6 +111,14 @@ static void parse_command_line(int argc, char **argv) {
       }
       break;
 
+    case 't':
+      threads = int(strtol(optarg, &p, 10));
+      if(p == optarg || threads <= 0) {
+	fprintf(stderr, "Bad number of threads \"%s\"\n",optarg);
+	errflg = true;
+      }
+      break;
+
     case  '?' :
       fprintf (stderr, "Unrecognized option -%c\n", optopt);
 
@@ -170,33 +182,15 @@ void pa_params(vector<int> & starts, vector<int> & counts) {
 }
 
 ////////////////////////////////////////////////////////////
-// main
+// correct_reads
 ////////////////////////////////////////////////////////////
-int main(int argc, char **argv) {
-  parse_command_line(argc, argv);
-
-  vector<int> starts;
-  vector<int> counts;
-  pa_params(starts, counts);
-  //for(int i = 0; i < threads; i++)
-  //  cout << counts[i] << " " << starts[i] << endl;
-
+static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> & counts, double (&ntnt_prob)[4][4]) {
   int error_reads = 0;
   int fixed_reads = 0;
-
-  //prefix_tree *trusted = new prefix_tree;
-  bithash *trusted = new bithash();
-  //dawg *trusted = new dawg();
-  trusted->tab_file_load(merf, cutoff);
-
-  omp_set_num_threads(threads);
-  //cout << omp_get_max_threads() << " threads" << endl;
 
 #pragma omp parallel //shared(trusted)
   {
     int tid = omp_get_thread_num();
-    //cout << "Initializing thread " << tid << endl;
-
     char* toutf = strdup(outf);
     char strtid[10];
     sprintf(strtid,"%d",tid);
@@ -209,7 +203,6 @@ int main(int argc, char **argv) {
     string header,ntseq,strqual;
     unsigned int iseq[read_len];
     char* nti;
-    const char* nts = "ACGTN";
     Read *r;
 
     int tcount = 0;
@@ -225,8 +218,7 @@ int main(int argc, char **argv) {
 	nti = strchr(nts, ntseq[i]);
 	iseq[i] = nti - nts;
       }
-
-      // find untrusted kmers
+      
       vector<int> untrusted;
       for(int i = 0; i < read_len-k+1; i++) {
 	if(!trusted->check(&iseq[i])) {
@@ -244,7 +236,7 @@ int main(int argc, char **argv) {
       if(untrusted.size() > 0) {
 	r = new Read(header, &iseq[0], strqual, untrusted, read_len);
 	error_reads++;
-	if(r->correct(trusted, reads_out))
+	if(r->multi_correct(trusted, reads_out, ntnt_prob))
 	  fixed_reads++;
 	delete r;
       }
@@ -257,6 +249,165 @@ int main(int argc, char **argv) {
 
   cout << "Error reads: " << error_reads << endl;
   cout << "Fixed reads: " << fixed_reads << endl;
+}
+
+////////////////////////////////////////////////////////////
+// learn_errors
+//
+// Correct reads using a much stricter filter in order
+// to count the nt->nt errors and learn the errors
+// probabilities
+////////////////////////////////////////////////////////////
+static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & counts, double (&ntnt_prob)[4][4]) {
+  int ntnt_counts[4][4] = {0};
+  unsigned int samples = 0;
+#pragma omp parallel //shared(trusted)
+  {
+    int tid = omp_get_thread_num();
+    char* toutf = strdup(outf);
+    char strtid[10];
+    sprintf(strtid,"%d",tid);
+    strcat(toutf, strtid);
+    ofstream reads_out(toutf);
+
+    ifstream reads_in(fastqf);
+    reads_in.seekg(starts[tid]);
+    
+    string header,ntseq,strqual;
+    unsigned int iseq[read_len];
+    char* nti;
+    Read *r;
+    correction* cor;
+
+    int tcount = 0;
+    while(getline(reads_in, header)) {
+      //cout << header << endl;
+
+      // get sequence
+      getline(reads_in, ntseq);
+      //cout << ntseq << endl;
+
+      // convert ntseq to iseq
+      for(int i = 0; i < read_len; i++) {
+	nti = strchr(nts, ntseq[i]);
+	iseq[i] = nti - nts;
+      }
+      
+      vector<int> untrusted;
+      for(int i = 0; i < read_len-k+1; i++) {
+	if(!trusted->check(&iseq[i])) {
+	  untrusted.push_back(i);
+	}
+      }
+    
+      // get quality values
+      getline(reads_in,strqual);
+      //cout << strqual << endl;
+      getline(reads_in,strqual);
+      //cout << strqual << endl;
+      
+      // fix error reads
+      if(untrusted.size() > 0) {
+	//cout << "Processing " << header;
+	//for(int i = 0; i < untrusted.size(); i++) {
+	//  cout << " " << untrusted[i];	  
+	//}
+	//cout << endl;
+
+	r = new Read(header, &iseq[0], strqual, untrusted, read_len);
+	if(r->multi_correct(trusted, reads_out, ntnt_prob, false)) {
+	  for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
+	    cor = r->trusted_read->corrections[c];
+	    if(iseq[cor->index] < 4) {
+	      // real -> observed, (real approximated by correction)
+	      ntnt_counts[cor->to][iseq[cor->index]]++;
+	      //ntnt_counts[iseq[cor->index]][cor->to]++;
+	      samples++;
+	    }
+	  }
+	}
+	delete r;
+      }
+
+      if(++tcount == counts[tid] || samples > 30000)
+	break;
+    }
+    reads_in.close();
+  }
+
+  cout << "Count matrix:" << endl;
+  cout << "\tA\tC\tG\tT" << endl;
+  for(int i = 0; i < 4; i++) {
+    cout << nts[i];
+    for(int j = 0; j < 4; j++) {
+      if(i == j)
+	cout << "\t-";
+      else
+	cout << "\t" << ntnt_counts[i][j];
+    }
+    cout << endl;
+  }
+  cout << endl;
+
+  // make counts into probabilities
+  int ntsum;
+  for(int i = 0; i < 4; i++) {
+    // sum all corrections from this nt
+    ntsum = 0;
+    for(int j = 0; j < 4; j++) {
+      ntsum += ntnt_counts[i][j];
+    }
+
+    // normalize counts by sum
+    for(int j = 0; j < 4; j++) {
+      ntnt_prob[i][j] = (double)ntnt_counts[i][j] / double(ntsum);
+    }
+  }
+}
+
+
+////////////////////////////////////////////////////////////
+// main
+////////////////////////////////////////////////////////////
+int main(int argc, char **argv) {
+  parse_command_line(argc, argv);
+
+  // set up parallelism
+  omp_set_num_threads(threads);
+  vector<int> starts;
+  vector<int> counts;
+  pa_params(starts, counts);
+
+  // make trusted kmer data structure
+  //prefix_tree *trusted = new prefix_tree;
+  bithash *trusted = new bithash();
+  //dawg *trusted = new dawg();
+  trusted->tab_file_load(merf, cutoff);
+
+  // learn nt->nt transitions
+  double ntnt_prob[4][4] = {0};
+  for(int i = 0; i < 4; i++) {
+    for(int j = 0; j < 4; j++) {
+      if(i != j)
+	ntnt_prob[i][j] = 1.0/3.0;
+    }
+  }
+  learn_errors(trusted, starts, counts, ntnt_prob);
+
+  cout << "New error matrix:" << endl;
+  cout << "\tA\tC\tG\tT" << endl;
+  for(int i = 0; i < 4; i++) {
+    cout << nts[i];
+    for(int j = 0; j < 4; j++) {
+      if(i == j)
+	cout << "\t-";
+      else
+	cout << "\t" << setprecision(4) << ntnt_prob[i][j];
+    }
+    cout << endl;
+  }
+
+  correct_reads(trusted, starts, counts, ntnt_prob);  
 
   return 0;
 }

@@ -7,6 +7,8 @@ import math, random, os, dna
 # Test my error correction program with simulated reads
 ############################################################
 
+errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
+
 like_t = .00001
 like_spread_t = .1
 
@@ -17,8 +19,8 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    num_reads = 50000
-    err_profs = get_error_profiles(num_reads)
+    num_reads = 30000
+    err_profs = get_error_profiles(num_reads, True)
 
     # make genome
     genome = ''
@@ -42,25 +44,35 @@ def main():
     # compare corrected reads
     compare_corrections(err_reads, genome)
 
+
 ############################################################
 # get_error_profiles
 #
-# Read in actual error profiles from H. pylori reads
+# Read in actual error profiles from a fastq file.  If rand
+# is true, read in all error profiles and randomly sample
+# the number desired.  (May have memory issues for a huge
+# file.)
 ############################################################
-def get_error_profiles(num):
+def get_error_profiles(num, rand=False):
     err_profs = []
-    fqf = open('/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq')
+    fqf = open(errorprofile_file)
     line = fqf.readline()
     while line:
         line = fqf.readline()
         line = fqf.readline()
         line = fqf.readline()
         err_profs.append(line.rstrip())
-        num = num - 1
-        if num <= 0:
-            break
-        line = fqf.readline()        
-    return err_profs
+        if not rand:
+            num = num - 1
+            if num <= 0:
+                break
+        line = fqf.readline()
+
+    if rand:
+        return random.sample(err_profs, num)
+    else:
+        return err_profs
+
 
 ############################################################
 # simulate_error_reads
@@ -128,11 +140,15 @@ def compare_corrections(err_reads, genome):
     right_wrong_correction = 0
     right_ambiguous = 0
     right_threshold = 0
+    correctable_abstained = 0
     
     for line in open('out.txt'):
         a = line.split()
 
         # corrected read
+        if not err_reads.has_key(a[0]):
+            # already seen as ambiguous
+            continue
         er = err_reads[a[0]]
 
         if len(a) == 3:
@@ -145,7 +161,22 @@ def compare_corrections(err_reads, genome):
                 else:
                     print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], rlike)
 
-            elif a[2] != '-':
+            elif a[2] == '-':
+                # no correction found
+                rlike = likelihood(er['orig'], er['err'], er['qual'])
+                if rlike > like_t:
+                    print 'correction should have been made: %s %s %s %s %f' % (a[0],er['orig'],er['err'],er['qual'],rlike)
+                else:
+                    right_threshold += 1
+
+            elif a[2] == '.':
+                # read too crappy to bother
+                rlike = likelihood(er['orig'], er['err'], er['qual'])
+                if rlike > like_t:
+                    correctable_abstained += 1
+
+            else:
+                # corrected improperly
                 if(not check_trust(a[2], genome)):
                     print 'correction should have failed due to lack of trust %s %s %s' % (a[0], a[1], a[2])
 
@@ -161,7 +192,8 @@ def compare_corrections(err_reads, genome):
                     print 'correction should have failed due to ambiguity: %s %s %s %s %f %f' % (a[0], er['orig'], er['err'], er['qual'], rlike, clike)
 
                 elif clike < like_t:
-                    print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)            
+                    print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)
+                
 
         elif len(a) == 4:
             # ambiguous read
@@ -175,22 +207,12 @@ def compare_corrections(err_reads, genome):
 
         del err_reads[a[0]]
 
-    ########################################
-    # check uncorrected reads
-    ########################################
-    for header in err_reads:
-        er = err_reads[header]
-        
-        rlike = likelihood(er['orig'], er['err'], er['qual'])
-        if rlike > like_t:
-            print 'correction should have been made: %s %s %s %s %f' % (header,er['orig'],er['err'],er['qual'],rlike)
-        else:
-            right_threshold += 1
 
     print 'Right correction: %d' % right_correction
     print 'Optimal but incorrect correction: %d' % right_wrong_correction
     print 'Optimal ambiguity restraint in not correcting: %d' % right_ambiguous
     print 'Optimal threshold restraint in not correcting: %d' % right_threshold
+    print 'Gave up, but read was correctable over threshold: %d' % correctable_abstained
 
 
 ############################################################
