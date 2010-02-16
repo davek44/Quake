@@ -1,5 +1,0 @@
-#include <iostream>
-
-int main() {
-  const char* nts = "ACGT";
-  cout << strchr(nts, "N");

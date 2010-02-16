@@ -1,3 +1,0 @@
-#include "read.h"
-
-read::read(int read_length) {
