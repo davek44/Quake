@@ -19,7 +19,7 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    num_reads = 10000
+    num_reads = 40000
     err_profs = get_error_profiles(num_reads, True)
 
     # make genome

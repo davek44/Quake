@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:m:o:c:l:t:";
+const static char* myopts = "r:m:o:c:t:";
 // -r, fastq file of reads
 static char* fastqf = NULL;
 // -m, mer counts
@@ -24,8 +24,6 @@ static char* merf = NULL;
 static char* outf = "out.txt";
 // -c, cutoff between trusted and untrusted mers
 static int cutoff;
-// -l, read length
-static int read_len = 36;
 // -p, number of threads
 static int threads = 4;
 
@@ -99,14 +97,6 @@ static void parse_command_line(int argc, char **argv) {
       cutoff = int(strtol(optarg, &p, 10));
       if(p == optarg || cutoff < 0) {
 	fprintf(stderr, "Bad mer cutoff value \"%s\"\n",optarg);
-	errflg = true;
-      }
-      break;
-
-    case 'l':
-      read_len = int(strtol(optarg, &p, 10));
-      if(p == optarg || read_len <= 0) {
-	fprintf(stderr, "Bad read length value \"%s\"\n",optarg);
 	errflg = true;
       }
       break;
@@ -200,8 +190,7 @@ static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> &
     ifstream reads_in(fastqf);
     reads_in.seekg(starts[tid]);
     
-    string header,ntseq,strqual;
-    unsigned int iseq[read_len];
+    string header,ntseq,strqual;    
     char* nti;
     Read *r;
 
@@ -214,13 +203,14 @@ static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> &
       //cout << ntseq << endl;
 
       // convert ntseq to iseq
-      for(int i = 0; i < read_len; i++) {
-	nti = strchr(nts, ntseq[i]);
-	iseq[i] = nti - nts;
+      vector<unsigned int> iseq;
+      for(int i = 0; i < ntseq.size(); i++) {
+	nti = strchr(nts, ntseq[i]);	
+	iseq.push_back(nti - nts);
       }
       
       vector<int> untrusted;
-      for(int i = 0; i < read_len-k+1; i++) {
+      for(int i = 0; i < iseq.size()-k+1; i++) {
 	if(!trusted->check(&iseq[i])) {
 	  untrusted.push_back(i);
 	}
@@ -234,7 +224,7 @@ static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> &
       
       // fix error reads
       if(untrusted.size() > 0) {
-	r = new Read(header, &iseq[0], strqual, untrusted, read_len);
+	r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
 	error_reads++;
 	if(r->multi_correct(trusted, reads_out, ntnt_prob))
 	  fixed_reads++;
@@ -274,7 +264,6 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
     reads_in.seekg(starts[tid]);
     
     string header,ntseq,strqual;
-    unsigned int iseq[read_len];
     char* nti;
     Read *r;
     //correction* cor;
@@ -288,13 +277,14 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
       //cout << ntseq << endl;
 
       // convert ntseq to iseq
-      for(int i = 0; i < read_len; i++) {
+      vector<unsigned int> iseq;
+      for(int i = 0; i < ntseq.size(); i++) {
 	nti = strchr(nts, ntseq[i]);
-	iseq[i] = nti - nts;
+	iseq.push_back(nti - nts);
       }
       
       vector<int> untrusted;
-      for(int i = 0; i < read_len-k+1; i++) {
+      for(int i = 0; i < iseq.size()-k+1; i++) {
 	if(!trusted->check(&iseq[i])) {
 	  untrusted.push_back(i);
 	}
@@ -314,7 +304,7 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
 	//}
 	//cout << endl;
 
-	r = new Read(header, &iseq[0], strqual, untrusted, read_len);
+	r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
 	if(r->multi_correct(trusted, reads_out, ntnt_prob, false)) {
 	  for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
 	    correction cor = r->trusted_read->corrections[c];
