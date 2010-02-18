@@ -11,6 +11,7 @@ errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG
 
 like_t = .00001
 like_spread_t = .1
+trimq = 3
 
 ############################################################
 # main
@@ -38,7 +39,7 @@ def main():
     trusted_kmers(genome)
 
     # run ./correct
-    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99')
+    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -t 0')
     os.system('cat out.txt? > out.txt')
 
     # compare corrected reads
@@ -93,7 +94,7 @@ def simulate_error_reads(genome, err_profs):
         mseq = list(seq)
         for j in range(36):
             err_prob = math.pow(10.0,-(ord(err_profs[i][j])-33.0)/10.0)
-            if err_prob == 1.0:
+            if err_prob > .75:
                 mseq[j] = 'N'
             elif random.random() < err_prob:
                 if mseq[j] == 'A':
@@ -140,6 +141,7 @@ def compare_corrections(err_reads, genome):
     right_wrong_correction = 0
     right_ambiguous = 0
     right_threshold = 0
+    right_trim = 0
     correctable_abstained = 0
     
     for line in open('out.txt'):
@@ -151,7 +153,15 @@ def compare_corrections(err_reads, genome):
             continue
         er = err_reads[a[0]]
 
+        
         if len(a) == 3:
+            # check trimming
+            if len(a[2]) > 1 and len(a[2]) != len(er['err']):
+               if check_trim(a[2], er):
+                   right_trim += 1
+               else:
+                   print 'Bad trim: %s %s %s %s %s' % (a[0],er['orig'],er['err'],er['qual'],a[2])
+
             if er['orig'] == a[2]:
                 # proper correction
                 rlike = likelihood(er['orig'], er['err'], er['qual'])
@@ -164,7 +174,7 @@ def compare_corrections(err_reads, genome):
             elif a[2] == '-':
                 # no correction found
                 rlike = likelihood(er['orig'], er['err'], er['qual'])
-                if rlike > like_t:
+                if rlike > like_t and er['err'].find('N') == -1:
                     print 'correction should have been made: %s %s %s %s %f' % (a[0],er['orig'],er['err'],er['qual'],rlike)
                 else:
                     right_threshold += 1
@@ -176,24 +186,28 @@ def compare_corrections(err_reads, genome):
                     correctable_abstained += 1
 
             else:
-                # corrected improperly
-                if(not check_trust(a[2], genome)):
-                    print 'correction should have failed due to lack of trust %s %s %s' % (a[0], a[1], a[2])
+                if len(a[2]) == len(er['orig']):
+                    # no trim so corrected improperly
+                    if(not check_trust(a[2], genome)):
+                        print 'correction should have failed due to lack of trust %s %s %s' % (a[0], a[1], a[2])
 
-                clike = likelihood(a[2], a[1], er['qual'])
-                rlike = likelihood(er['orig'], er['err'], er['qual'])
+                    clike = likelihood(a[2], a[1], er['qual'])
+                    rlike = likelihood(er['orig'], er['err'], er['qual'])
 
-                if clike*like_spread_t > rlike:
-                    # proper action
-                    right_wrong_correction += 1
+                    if clike*like_spread_t > rlike:
+                        # proper action
+                        right_wrong_correction += 1
 
-                elif clike > rlike and clike*like_spread_t < rlike:
-                    # action is best, but ambiguous
-                    print 'correction should have failed due to ambiguity: %s %s %s %s %f %f' % (a[0], er['orig'], er['err'], er['qual'], rlike, clike)
+                    elif clike > rlike and clike*like_spread_t < rlike:
+                        # action is best, but ambiguous
+                        print 'correction should have failed due to ambiguity: %s %s %s %s %f %f' % (a[0], er['orig'], er['err'], er['qual'], rlike, clike)
 
-                elif clike < like_t:
-                    print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)
-                
+                    elif clike < like_t:
+                        print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)
+
+                else:
+                    # trimmed
+                    x = 7
 
         elif len(a) == 4:
             # ambiguous read
@@ -213,13 +227,16 @@ def compare_corrections(err_reads, genome):
     print 'Optimal ambiguity restraint in not correcting: %d' % right_ambiguous
     print 'Optimal threshold restraint in not correcting: %d' % right_threshold
     print 'Gave up, but read was correctable over threshold: %d' % correctable_abstained
+    print 'Right trim: %d' % right_trim
 
 
 ############################################################
 # likelihood
 #
 # Return the likelihood of observing 'obs_read' given 
-# the actual read and quality values
+# the actual read and quality values.
+# 
+# Note that if the obs_q = .25, the likelihood ratio is 1.0
 ############################################################
 def likelihood(actual_read, obs_read, quals):
     like = 1.0
@@ -233,12 +250,47 @@ def likelihood(actual_read, obs_read, quals):
 
 ############################################################
 # check_trust
+#
+# Check for the existence of the kmers in seq in the 
+# genome.
 ############################################################
 def check_trust(seq, genome):
     for i in range(len(seq)-15+1):
         if genome.find(seq[i:i+15]) == -1 and genome.find(dna.rc(seq[i:i+15])):
             return False
     return True
+
+############################################################
+# check_trim
+#
+# Check that trimming was properly done.  The true trim
+# is the BWA trim point minus any correctable errors.  So
+# vaid trim points are the BWA point as well as any number
+# of correctable errors
+############################################################
+def check_trim(seq, error_read):
+    # determine BWA trim point
+    BWA_trim = len(error_read['qual'])
+    max_score = 0
+    for i in range(len(error_read['qual'])):
+        score = 0
+        for q in range(i,len(error_read['qual'])):
+            score += trimq - (ord(error_read['qual'][i])-33)
+        #print '%d: %d' % (i,score)
+        if score > max_score:
+            max_score = score
+            BWA_trim = i
+
+    #print len(seq)
+    #print BWA_trim
+    trim_pt = len(seq)
+    if trim_pt == BWA_trim:
+        return True
+    elif error_read['orig'][trim_pt] != error_read['err'][trim_pt]:
+        return True
+    else:
+        return False
+
 
 ############################################################
 # __main__

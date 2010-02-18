@@ -40,6 +40,7 @@ Read::Read(const string & h, const unsigned int* s, const string & q, vector<int
 
   header = h;
   read_length = rl;
+  trim_length = rl;
   seq = new unsigned int[read_length];
   prob = new float[read_length];
   for(int i = 0; i < read_length; i++) {
@@ -58,12 +59,51 @@ Read::~Read() {
 }
 
 ////////////////////////////////////////////////////////////
-// correct
+// trim
+//
+// Trim the end of the read the way BWA does it.
+// Returns true if trimming corrects the read.
+////////////////////////////////////////////////////////////
+bool Read::trim(int t, ofstream & out) {
+  // find trim index
+  int phredq;
+  int current_trimfunc = 0;
+  int max_trimfunc = 0;
+  trim_length = read_length; // already set in constructor but ok
+  for(int i = read_length-1; i >= 0; i--) {
+    phredq = floor(.5-10*log(1.0 - prob[i])/log(10));
+    current_trimfunc += (t - phredq);
+    if(current_trimfunc > max_trimfunc) {
+      max_trimfunc = current_trimfunc;
+      trim_length = i;
+    }
+  }
+
+  // update untrusted
+  for(int i = untrusted.size()-1; i >= 0; i--) {
+    if(untrusted[i] >= trim_length)
+      untrusted.pop_back();
+  }
+
+  // is read corrected now?
+  if(untrusted.empty()) {
+    vector<correction> no_cors;
+    out << print_seq() << print_corrected(no_cors);
+    return true;
+  } else
+    return false;
+}
+
+
+////////////////////////////////////////////////////////////
+// single_correct
 //
 // Find the set of corrections with maximum likelihood
-// that result in all trusted kmers
+// that result in all trusted kmers.
+//
+// Assumes a short read so obsolete.
 ////////////////////////////////////////////////////////////
-bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning) {
+bool Read::single_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning) {
   if(correct_subset(untrusted, trusted, out, ntnt_prob, learning)) {
     out << header << "\t" << print_seq() << "\t" << print_corrected(trusted_read->corrections) << endl;
     return true;
@@ -343,12 +383,17 @@ string Read::print_seq() {
 
 ////////////////////////////////////////////////////////////
 // print_corrected
+//
+// Print read with corrections and trimming.
 ////////////////////////////////////////////////////////////
 string Read::print_corrected(vector<correction> & cor) {
+  return print_corrected(cor, trim_length);
+}
+string Read::print_corrected(vector<correction> & cor, int print_nt) {
   char nts[5] = {'A','C','G','T','N'};
   string sseq;
   int correct_i;
-  for(int i = 0; i < read_length; i++) {
+  for(int i = 0; i < print_nt; i++) {
     correct_i = -1;
     for(int c = 0; c < cor.size(); c++) {
       if(cor[c].index == i)
@@ -364,13 +409,13 @@ string Read::print_corrected(vector<correction> & cor) {
   
 
 ////////////////////////////////////////////////////////////
-// multi_correct
+// correct
 //
 // Perform correction by breaking up untrusted kmers
 // into connected components and correcting them
 // independently.
 ////////////////////////////////////////////////////////////
-bool Read::multi_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning) {
+bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning) {
   // current connected component
   vector<int> cc_untrusted;
   cc_untrusted.push_back(untrusted[0]);
@@ -392,7 +437,12 @@ bool Read::multi_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4
 	cc_untrusted.clear();
       } else {
 	// cannot correct
-	return false;
+	if(cc_untrusted[0] >= trim_t) {
+	  // but can trim
+	  out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]);
+	  return true;
+	} else
+	  return false;	  
       }
     }
     // add to current component
@@ -408,7 +458,12 @@ bool Read::multi_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4
     
   } else {
     // cannot correct
-    return false;
+    if(cc_untrusted[0] >= trim_t) {
+      // but can trim
+      out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]);
+      return true;
+    } else
+      return false;
   }
 
   // print read with all corrections

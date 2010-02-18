@@ -19,7 +19,6 @@ def main():
     parser.add_option('-r', dest='readsf', help='Fastq file of reads')
     parser.add_option('-k', dest='k', type='int', help='Size of k-mers to correct')
     parser.add_option('-p', dest='proc', type='int', help='Number of processes')
-    parser.add_option('-l', dest='read_len', type='int', help='Read length')
 
     (options, args) = parser.parse_args()
 
@@ -46,7 +45,7 @@ def main():
     cutoff = int(open('cutoff.txt').readline())
 
     # run correct C++ code
-    os.system('correct -r %s -m %s -c %d -t %d -l %d' % (options.readsf, ctsf, cutoff, options.proc, options.read_len))
+    os.system('correct -r %s -m %s -c %d -p %d' % (options.readsf, ctsf, cutoff, options.proc))
 
     os.system('cat out.txt?* > out.txt')
     os.system('rm out.txt?*')

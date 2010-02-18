@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:m:o:c:t:";
+const static char* myopts = "r:m:o:c:t:l:";
 // -r, fastq file of reads
 static char* fastqf = NULL;
 // -m, mer counts
@@ -24,8 +24,12 @@ static char* merf = NULL;
 static char* outf = "out.txt";
 // -c, cutoff between trusted and untrusted mers
 static int cutoff;
+// -t
+static int trimq = 3;
 // -p, number of threads
 static int threads = 4;
+
+// Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
 static const char* nts = "ACGTN";
@@ -102,6 +106,14 @@ static void parse_command_line(int argc, char **argv) {
       break;
 
     case 't':
+      trimq = int(strtol(optarg, &p, 10));
+      if(p == optarg || trimq <= 1) {
+	fprintf(stderr, "Bad trim quality value \"%s\"\n",optarg);
+	errflg = true;
+      }
+      break;
+
+    case 'p':
       threads = int(strtol(optarg, &p, 10));
       if(p == optarg || threads <= 0) {
 	fprintf(stderr, "Bad number of threads \"%s\"\n",optarg);
@@ -226,7 +238,8 @@ static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> &
       if(untrusted.size() > 0) {
 	r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
 	error_reads++;
-	if(r->multi_correct(trusted, reads_out, ntnt_prob))
+
+	if(r->trim(trimq, reads_out) || r->correct(trusted, reads_out, ntnt_prob))
 	  fixed_reads++;
 	delete r;
       }
@@ -305,7 +318,9 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
 	//cout << endl;
 
 	r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
-	if(r->multi_correct(trusted, reads_out, ntnt_prob, false)) {
+
+	// if trimmed to no errors, trusted_read doesn't exist
+	if(!r->trim(trimq, reads_out) && r->correct(trusted, reads_out, ntnt_prob, false)) {
 	  for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
 	    correction cor = r->trusted_read->corrections[c];
 	    if(iseq[cor.index] < 4) {
@@ -319,7 +334,7 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
 	delete r;
       }
 
-      if(++tcount == counts[tid] || samples > 30000)
+      if(++tcount == counts[tid] || samples > 35000)
 	break;
     }
     reads_in.close();
