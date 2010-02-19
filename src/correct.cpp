@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:m:o:c:t:l:";
+const static char* myopts = "r:m:o:c:t:l:q:";
 // -r, fastq file of reads
 static char* fastqf = NULL;
 // -m, mer counts
@@ -24,8 +24,10 @@ static char* merf = NULL;
 static char* outf = "out.txt";
 // -c, cutoff between trusted and untrusted mers
 static int cutoff;
-// -t
+// -q
 static int trimq = 3;
+// -t
+int Read::trim_t = 35;
 // -p, number of threads
 static int threads = 4;
 
@@ -105,10 +107,18 @@ static void parse_command_line(int argc, char **argv) {
       }
       break;
 
-    case 't':
+    case 'q':
       trimq = int(strtol(optarg, &p, 10));
       if(p == optarg || trimq < 0) {
 	fprintf(stderr, "Bad trim quality value \"%s\"\n",optarg);
+	errflg = true;
+      }
+      break;
+
+    case 't':
+      Read::trim_t = int(strtol(optarg, &p, 10));
+      if(p == optarg || Read::trim_t < 1) {
+	fprintf(stderr, "Bad trim threshold \"%s\"\n",optarg);
 	errflg = true;
       }
       break;

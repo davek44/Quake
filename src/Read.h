@@ -91,6 +91,11 @@ class Read {
   vector<int> untrusted;
   corrected_read *trusted_read;
 
+  const static float trust_spread_t = .1;
+  const static float correct_min_t = .00001;
+  const static float learning_min_t = .005;
+  static int trim_t;
+
  private:
   bool untrusted_intersect(vector<int> untrusted_subset, vector<short> & region);
   void untrusted_union(vector<int> untrusted_subset, vector<short> & region);
@@ -101,10 +106,6 @@ class Read {
   string print_corrected(vector<correction> & cor, int print_nt);
 
   float likelihood;
-  const static float trust_spread_t = .1;
-  const static float correct_min_t = .00001;
-  const static float learning_min_t = .005;
-  const static float trim_t = 35;
 };
 
 #endif

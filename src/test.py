@@ -277,7 +277,7 @@ def check_trim(seq, error_read):
         for q in range(i,len(error_read['qual'])):
             score += (trimq - (ord(error_read['qual'][q])-33))
         #print '%d: %d' % (i,score)
-        if score > max_score:
+        if score >= max_score:
             max_score = score
             BWA_trim = i
 
