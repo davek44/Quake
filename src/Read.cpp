@@ -152,16 +152,8 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
       return false;
     }
   }
-  else {
-    if(badnt >= 8)
+  else if(badnt >= 8)
       forfeit_easily = true;
-
-    // filter reads that look like low coverage
-    if(untrusted_subset.size() > .95*(read_length-k+1) && avgprob > .99) {
-      out << header << "\t" << print_seq() << "\t+" << endl;
-      return false;
-    }
-  }
 
   // sort by quality
   quality_quicksort(region, 0, region.size()-1);
@@ -188,11 +180,9 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
 
     for(short nt = 0; nt < 4; nt++) {
       if(seq[edit_i] != nt) {
-	//like = (1.0-prob[edit_i])/3.0 / prob[edit_i];
 	like = (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
 	
 	next_cr = new corrected_read(bituntrusted, like, region_edit+1);
-	//next_cr->corrections.push_back(new correction(edit_i, nt));
 	next_cr->corrections.push_back(correction(edit_i, nt));
       
 	// add to priority queue
@@ -217,7 +207,6 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
     if(cpq.size() > max_pq)
       max_pq = cpq.size();
     
-
     // give up on read if it was marked and no trusted reads have been found by 30k
     if(forfeit_easily && trusted_read == 0 && cpq.size() > 30000) {
       quit_early = true;
@@ -243,20 +232,6 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
     //cpq.pop();
     pop_heap(cpq.begin(), cpq.end(), cpq_comp);
     cpq.pop_back();
-
-    // print read  
-    if(DEBUG) {
-      if(header == "@8812") {
-	printf("\nQueue size: %d\n",cpq.size());
-	printf("Region edit: %d\nCorrections:",cr->region_edits);
-	for(int i = 0; i < cr->corrections.size(); i++) {
-	  printf("%d: %d, ", cr->corrections[i].index, cr->corrections[i].to);
-	}
-	printf("\n");
-	cout << print_corrected(cr->corrections) << endl;
-	printf("Like: %f\n",cr->likelihood);
-      } 
-    }
 
     // save for later comparison
     untrusted_count = (signed int)cr->untrusted.count();
@@ -310,7 +285,6 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
 	    // calculate new likelihood
 	    // error is real->observed, (with real approximated by correction)
 	    like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
-	    //like = cr->likelihood * (1.0-prob[edit_i])/3.0 / prob[edit_i];
 	    
 	    // if thresholds ok, add new correction
 	    if(trusted_read != 0) {
@@ -353,19 +327,17 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
   for(int i = 0; i < cpq.size(); i++)
     delete cpq[i];
 
-  //int t = 0;
-  //if(trusted_read != 0)
-  //  t = 1;  
-  //cout << header << "\t" << max_pq << "\t" << avgprob << "\t" << badnt << "\t" << region.size() << "\t" << t << endl;
-
   if(trusted_read != 0) {
     //out << header << "\t" << print_seq() << "\t" << print_corrected(trusted_read->corrections) << endl;
     return true;
-  } else {    
-    if(quit_early)
-      out << header << "\t" << print_seq() << "\t." << endl;
-    else
-      out << header << "\t" << print_seq() << "\t-" << endl;
+  } else {
+    // if trim-able, don't print
+    if(untrusted_subset[0]-k+1 < trim_t) {
+      if(quit_early)
+	out << header << "\t" << print_seq() << "\t." << endl;
+      else
+	out << header << "\t" << print_seq() << "\t-" << endl;
+    }   
     return false;
   }
 }
@@ -437,9 +409,9 @@ bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], 
 	cc_untrusted.clear();
       } else {
 	// cannot correct
-	if(cc_untrusted[0] >= trim_t) {
+	if(cc_untrusted[0]-k+1 >= trim_t) {
 	  // but can trim
-	  out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]);
+	  out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]-k+1);
 	  return true;
 	} else
 	  return false;	  
@@ -458,9 +430,9 @@ bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], 
     
   } else {
     // cannot correct
-    if(cc_untrusted[0] >= trim_t) {
+    if(cc_untrusted[0]-k+1 >= trim_t) {
       // but can trim
-      out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]);
+      out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]-k+1);
       return true;
     } else
       return false;

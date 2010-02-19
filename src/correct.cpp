@@ -107,7 +107,7 @@ static void parse_command_line(int argc, char **argv) {
 
     case 't':
       trimq = int(strtol(optarg, &p, 10));
-      if(p == optarg || trimq <= 1) {
+      if(p == optarg || trimq < 0) {
 	fprintf(stderr, "Bad trim quality value \"%s\"\n",optarg);
 	errflg = true;
       }

@@ -39,7 +39,7 @@ def main():
     trusted_kmers(genome)
 
     # run ./correct
-    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -t 0')
+    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99')
     os.system('cat out.txt? > out.txt')
 
     # compare corrected reads
@@ -275,7 +275,7 @@ def check_trim(seq, error_read):
     for i in range(len(error_read['qual'])):
         score = 0
         for q in range(i,len(error_read['qual'])):
-            score += trimq - (ord(error_read['qual'][i])-33)
+            score += (trimq - (ord(error_read['qual'][q])-33))
         #print '%d: %d' % (i,score)
         if score > max_score:
             max_score = score
