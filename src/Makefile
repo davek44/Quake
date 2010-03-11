@@ -1,5 +1,5 @@
 CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
-CFLAGS=-g -O3 -fopenmp
+CFLAGS=-O3 -fopenmp
 CPPUNIT_PATH = /fs/sz-user-supported/Linux-x86_64
 
 #correct: correct.cpp Read.o prefix_tree.o node.o
@@ -9,7 +9,10 @@ correct: correct.cpp Read.o bithash.o
 #correct: correct.cpp Read.o dawg.o node.o
 #	$(CC) $(CFLAGS) correct.cpp Read.o dawg.o node.o -o correct
 
-Read.o: Read.cpp Read.h
+trim: trim.cpp Read.o bithash.o
+	$(CC) $(CFLAGS) trim.cpp Read.o bithash.o -o trim
+
+Read.o: Read.cpp Read.h bithash.o
 	$(CC) $(CFLAGS) -c Read.cpp
 
 #prefix_tree.o: prefix_tree.cpp prefix_tree.h
@@ -29,4 +32,4 @@ bithash.o: bithash.cpp bithash.h
 #	$(CC) $(CFLAGS) -I${CPPUNIT_PATH}/include -L${CPPUNIT_PATH}/lib -lcppunit -ldl mainTest.cpp bithashTest.cpp bithash.cpp -o test
 
 clean:
-	rm correct test *.o
+	rm correct trim test *.o

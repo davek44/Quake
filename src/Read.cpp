@@ -6,7 +6,7 @@
 #include <set>
 #include <queue>
 
-#define TESTING true
+#define TESTING false
 #define DEBUG false
 
 ////////////////////////////////////////////////////////////
@@ -46,9 +46,13 @@ Read::Read(const string & h, const unsigned int* s, const string & q, vector<int
   for(int i = 0; i < read_length; i++) {
     seq[i] = s[i];    
     // quality values of 0,1 lead to p < .25
-    prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-33)/10.0));
+    if(illumina_qual)
+      prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-64)/10.0));
+    else
+      prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-33)/10.0));
   }
   trusted_read = 0;
+  global_like = 1.0;
 }
 
 Read::~Read() {
@@ -62,9 +66,29 @@ Read::~Read() {
 // trim
 //
 // Trim the end of the read the way BWA does it.
-// Returns true if trimming corrects the read.
+// Returns true if trimming eliminates untrusted kmers
+// Print corrected reads to out
 ////////////////////////////////////////////////////////////
 bool Read::trim(int t, ofstream & out) {
+  if(trim(t)) {
+    if(trim_length >= trim_t) {
+      vector<correction> no_cors;
+      out << header << "\t" << print_seq() << "\t" << print_corrected(no_cors) << endl;
+    } else
+      out << header << "\t" << print_seq() << "\t-" << endl;
+
+    return true;
+  } else
+    return false;
+}
+
+////////////////////////////////////////////////////////////
+// trim
+//
+// Trim the end of the read the way BWA does it.
+// Returns true if trimming eliminates untrusted kmers
+////////////////////////////////////////////////////////////
+bool Read::trim(int t) {
   // find trim index
   int phredq;
   int current_trimfunc = 0;
@@ -86,15 +110,11 @@ bool Read::trim(int t, ofstream & out) {
   }
 
   // is read corrected now?
-  if(untrusted.empty()) {
-    vector<correction> no_cors;
-    out << print_seq() << print_corrected(no_cors);
+  if(untrusted.empty())
     return true;
-  } else
+  else
     return false;
 }
-
-
 ////////////////////////////////////////////////////////////
 // single_correct
 //
@@ -180,7 +200,8 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
 
     for(short nt = 0; nt < 4; nt++) {
       if(seq[edit_i] != nt) {
-	like = (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
+	//like = (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
+	like = (1.0-prob[edit_i]) * ntnt_prob[seq[edit_i]][nt] / prob[edit_i];
 	
 	next_cr = new corrected_read(bituntrusted, like, region_edit+1);
 	next_cr->corrections.push_back(correction(edit_i, nt));
@@ -244,7 +265,7 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
       }
     } else {
       // if no corrected read exists and likelihood is too low, break loop return false
-      if(cr->likelihood < correct_min_t) {
+      if(global_like*cr->likelihood < correct_min_t) {
 	delete cr;
 	break;
       }
@@ -284,7 +305,8 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
 	  if(seq[edit_i] != nt) {
 	    // calculate new likelihood
 	    // error is real->observed, (with real approximated by correction)
-	    like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
+	    //like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
+	    like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[seq[edit_i]][nt] / prob[edit_i];
 	    
 	    // if thresholds ok, add new correction
 	    if(trusted_read != 0) {
@@ -292,7 +314,7 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, ofstre
 		continue;
 	    } else {
 	      // must consider spread or risk missing a case of ambiguity
-	      if(like < correct_min_t*trust_spread_t)
+	      if(global_like*like < correct_min_t*trust_spread_t)
 		continue;
 	    }
 	    
@@ -400,6 +422,7 @@ bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], 
 
       // correct current component
       if(correct_subset(cc_untrusted, trusted, out, ntnt_prob, learning)) {
+	global_like *= trusted_read->likelihood;
 
 	// store corrections
 	for(int c = 0; c < trusted_read->corrections.size(); c++)
@@ -411,7 +434,7 @@ bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], 
 	// cannot correct
 	if(cc_untrusted[0]-k+1 >= trim_t) {
 	  // but can trim
-	  out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]-k+1);
+	  out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]-k+1) << endl;
 	  return true;
 	} else
 	  return false;	  
@@ -423,6 +446,7 @@ bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], 
 
   // finish last component
   if(correct_subset(cc_untrusted, trusted, out, ntnt_prob, learning)) {
+    global_like *= trusted_read->likelihood;
 
     // store corrections
     for(int c = 0; c < trusted_read->corrections.size(); c++)
@@ -432,7 +456,7 @@ bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], 
     // cannot correct
     if(cc_untrusted[0]-k+1 >= trim_t) {
       // but can trim
-      out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]-k+1);
+      out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors, cc_untrusted[0]-k+1) << endl;
       return true;
     } else
       return false;
@@ -440,6 +464,11 @@ bool Read::correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], 
 
   // print read with all corrections
   out << header << "\t" << print_seq() << "\t" << print_corrected(multi_cors) << endl;
+
+  // create new trusted read
+  corrected_read * tmp = trusted_read;
+  trusted_read = new corrected_read(multi_cors, tmp->untrusted, global_like, 0);
+  delete tmp;
 
   return true;
 }

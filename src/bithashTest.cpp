@@ -60,5 +60,3 @@ void bithashTest::testCheckLong() {
   CPPUNIT_ASSERT(!bh.check(current, iseq[1], iseq[k+1]));
   CPPUNIT_ASSERT(bh.check(current, iseq[2], iseq[k+2]));
 }
-
-  

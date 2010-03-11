@@ -20,7 +20,7 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    num_reads = 40000
+    num_reads = 50000
     err_profs = get_error_profiles(num_reads, True)
 
     # make genome
@@ -39,7 +39,7 @@ def main():
     trusted_kmers(genome)
 
     # run ./correct
-    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99')
+    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 4')
     os.system('cat out.txt? > out.txt')
 
     # compare corrected reads
@@ -127,7 +127,7 @@ def trusted_kmers(genome):
     tkout = open('genome.cts','w')
     for i in range(len(genome)-15):
         #print >> tkout, '>100\n%s' % genome[i:i+15]
-        print >> tkout, '%s\t100' % genome[i:i+15]
+        print >> tkout, '%s\t100.0' % genome[i:i+15]
     tkout.close()
 
 ############################################################
@@ -167,7 +167,6 @@ def compare_corrections(err_reads, genome):
                 rlike = likelihood(er['orig'], er['err'], er['qual'])
                 if rlike > like_t:
                     right_correction += 1
-                    #print 'good correction!'
                 else:
                     print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], rlike)
 
@@ -189,7 +188,7 @@ def compare_corrections(err_reads, genome):
                 if len(a[2]) == len(er['orig']):
                     # no trim so corrected improperly
                     if(not check_trust(a[2], genome)):
-                        print 'correction should have failed due to lack of trust %s %s %s' % (a[0], a[1], a[2])
+                        print 'improper correction should have failed due to lack of trust %s %s %s' % (a[0], a[1], a[2])
 
                     clike = likelihood(a[2], a[1], er['qual'])
                     rlike = likelihood(er['orig'], er['err'], er['qual'])
@@ -200,14 +199,40 @@ def compare_corrections(err_reads, genome):
 
                     elif clike > rlike and clike*like_spread_t < rlike:
                         # action is best, but ambiguous
-                        print 'correction should have failed due to ambiguity: %s %s %s %s %f %f' % (a[0], er['orig'], er['err'], er['qual'], rlike, clike)
+                        print 'improper correction should have failed due to ambiguity: %s %s %s %s %f %f' % (a[0], er['orig'], er['err'], er['qual'], rlike, clike)
 
                     elif clike < like_t:
-                        print 'correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)
+                        print 'improper correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)
 
                 else:
                     # trimmed
-                    x = 7
+                    if a[2] == er['orig'][:len(a[2])]:
+                        # proper correction
+                        rlike = likelihood(er['orig'][:len(a[2])], er['err'][:len(a[2])], er['qual'][:len(a[2])])
+                        if rlike > like_t:
+                            right_correction += 1
+                        else:
+                            print 'trimmed correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], rlike)
+
+                    else:
+                        # corrected improperly
+                        if(not check_trust(a[2], genome)):
+                            print 'trimmed correction should have failed due to lack of trust %s %s %s' % (a[0], a[1], a[2])
+
+                        clike = likelihood(a[2], a[1][:len(a[2])], er['qual'][:len(a[2])])
+                        rlike = likelihood(er['orig'][:len(a[2])], er['err'][:len(a[2])], er['qual'][:len(a[2])])
+
+                        if clike*like_spread_t > rlike:
+                            # proper action
+                            right_wrong_correction += 1
+
+                        elif clike > rlike and clike*like_spread_t < rlike:
+                            # action is best, but ambiguous
+                            print 'trimmed correction should have failed due to ambiguity: %s %s %s %s %f %f' % (a[0], er['orig'], er['err'], er['qual'], rlike, clike)
+
+                        elif clike < like_t:
+                            print 'trimmed correction should have failed due to low likelihood: %s %s %s %s %f' % (a[0], er['orig'], er['err'], er['qual'], clike)
+
 
         elif len(a) == 4:
             # ambiguous read
@@ -248,6 +273,7 @@ def likelihood(actual_read, obs_read, quals):
             like *= change_q / obs_q
     return like
 
+
 ############################################################
 # check_trust
 #
@@ -256,7 +282,7 @@ def likelihood(actual_read, obs_read, quals):
 ############################################################
 def check_trust(seq, genome):
     for i in range(len(seq)-15+1):
-        if genome.find(seq[i:i+15]) == -1 and genome.find(dna.rc(seq[i:i+15])):
+        if genome.find(seq[i:i+15]) == -1 and genome.find(dna.rc(seq[i:i+15])) == -1:
             return False
     return True
 

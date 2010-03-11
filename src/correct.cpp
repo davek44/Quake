@@ -4,6 +4,7 @@
 #include "Read.h"
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include <string>
 #include <string.h>
@@ -15,19 +16,25 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:m:o:c:t:l:q:";
+const static char* myopts = "r:m:o:c:a:t:q:p:Is";
 // -r, fastq file of reads
 static char* fastqf = NULL;
 // -m, mer counts
 static char* merf = NULL;
 // -o, output file
 static char* outf = "out.txt";
+// -s, output corrected sequences
+bool Read::output_reads = False;
 // -c, cutoff between trusted and untrusted mers
-static int cutoff;
+static double cutoff = 0;
+// -a, AT cutoff
+static char* ATcutf = NULL;
 // -q
 static int trimq = 3;
+// -I
+bool Read::illumina_qual = false;
 // -t
-int Read::trim_t = 35;
+int Read::trim_t = 30;
 // -p, number of threads
 static int threads = 4;
 
@@ -100,11 +107,15 @@ static void parse_command_line(int argc, char **argv) {
       break;
 
     case 'c':
-      cutoff = int(strtol(optarg, &p, 10));
+      cutoff = double(strtol(optarg, &p, 10));
       if(p == optarg || cutoff < 0) {
 	fprintf(stderr, "Bad mer cutoff value \"%s\"\n",optarg);
 	errflg = true;
       }
+      break;
+
+    case 'a':
+      ATcutf = strdup(optarg);
       break;
 
     case 'q':
@@ -121,6 +132,14 @@ static void parse_command_line(int argc, char **argv) {
 	fprintf(stderr, "Bad trim threshold \"%s\"\n",optarg);
 	errflg = true;
       }
+      break;
+
+    case 'I':
+      Read::illumina_qual = true;
+      break;
+
+    case 's':
+      Read::output_reads = true;
       break;
 
     case 'p':
@@ -154,7 +173,7 @@ static void parse_command_line(int argc, char **argv) {
 ////////////////////////////////////////////////////////////
 // pa_params
 ////////////////////////////////////////////////////////////
-void pa_params(vector<int> & starts, vector<int> & counts) {
+void pa_params(vector<streampos> & starts, vector<streampos> & counts) {
   // count number of sequences
   int N = 0;
   ifstream reads_in(fastqf);
@@ -196,10 +215,7 @@ void pa_params(vector<int> & starts, vector<int> & counts) {
 ////////////////////////////////////////////////////////////
 // correct_reads
 ////////////////////////////////////////////////////////////
-static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> & counts, double (&ntnt_prob)[4][4]) {
-  int error_reads = 0;
-  int fixed_reads = 0;
-
+static void correct_reads(bithash * trusted, vector<streampos> & starts, vector<streampos> & counts, double (&ntnt_prob)[4][4]) {
 #pragma omp parallel //shared(trusted)
   {
     int tid = omp_get_thread_num();
@@ -247,10 +263,10 @@ static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> &
       // fix error reads
       if(untrusted.size() > 0) {
 	r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
-	error_reads++;
 
-	if(r->trim(trimq, reads_out) || r->correct(trusted, reads_out, ntnt_prob))
-	  fixed_reads++;
+	if(!r->trim(trimq, reads_out))
+	  r->correct(trusted, reads_out, ntnt_prob);
+
 	delete r;
       }
 
@@ -259,9 +275,6 @@ static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> &
     }
     reads_in.close();
   }
-
-  cout << "Error reads: " << error_reads << endl;
-  cout << "Fixed reads: " << fixed_reads << endl;
 }
 
 ////////////////////////////////////////////////////////////
@@ -271,7 +284,7 @@ static void correct_reads(bithash * trusted, vector<int> & starts, vector<int> &
 // to count the nt->nt errors and learn the errors
 // probabilities
 ////////////////////////////////////////////////////////////
-static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & counts, double (&ntnt_prob)[4][4]) {
+static void learn_errors(bithash * trusted, vector<streampos> & starts, vector<streampos> & counts, double (&ntnt_prob)[4][4]) {
   int ntnt_counts[4][4] = {0};
   unsigned int samples = 0;
 #pragma omp parallel //shared(trusted)
@@ -330,13 +343,15 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
 	r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
 
 	// if trimmed to no errors, trusted_read doesn't exist
-	if(!r->trim(trimq, reads_out) && r->correct(trusted, reads_out, ntnt_prob, false)) {
+	if(!r->trim(trimq, reads_out) && r->correct(trusted, reads_out, ntnt_prob, false) && r->trusted_read != 0) {
 	  for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
 	    correction cor = r->trusted_read->corrections[c];
 	    if(iseq[cor.index] < 4) {
 	      // real -> observed, (real approximated by correction)
-	      ntnt_counts[cor.to][iseq[cor.index]]++;
-	      //ntnt_counts[iseq[cor->index]][cor->to]++;
+	      //ntnt_counts[cor.to][iseq[cor.index]]++;
+
+	      // hmm well its best to compute P(real|observed)
+	      ntnt_counts[iseq[cor.index]][cor.to]++;
 	      samples++;
 	    }
 	  }
@@ -344,7 +359,7 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
 	delete r;
       }
 
-      if(++tcount == counts[tid] || samples > 35000)
+      if(++tcount == counts[tid] || samples > 50000)
 	break;
     }
     reads_in.close();
@@ -382,22 +397,53 @@ static void learn_errors(bithash * trusted, vector<int> & starts, vector<int> & 
 
 
 ////////////////////////////////////////////////////////////
+// load_AT_cutoffs
+//
+// Load AT cutoffs from file
+////////////////////////////////////////////////////////////
+vector<double> load_AT_cutoffs() {
+  vector<double> cutoffs;
+  ifstream cut_in(ATcutf);
+  string line;
+  double cut;
+  
+  while(getline(cut_in, line)) {
+    stringstream ss(stringstream::in | stringstream::out);
+    ss << line;
+    ss >> cut;
+    cutoffs.push_back(cut);
+  }
+
+  if(cutoffs.size() != (k+1)) {
+    cerr << "Must specify " << (k+1) << " AT cutoffs in " << ATcutf << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  return cutoffs;
+}
+////////////////////////////////////////////////////////////
 // main
 ////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
+  if(cutoff == 0 and ATcutf == NULL)
+    cerr << "Must provide a trusted/untrusted kmer cutoff (-c) or a file containing the cutoff as a function of the AT content (-a)" << endl;
+
   // set up parallelism
   omp_set_num_threads(threads);
-  vector<int> starts;
-  vector<int> counts;
+  vector<streampos> starts;
+  vector<streampos> counts;
   pa_params(starts, counts);
 
   // make trusted kmer data structure
   //prefix_tree *trusted = new prefix_tree;
   bithash *trusted = new bithash();
   //dawg *trusted = new dawg();
-  trusted->tab_file_load(merf, cutoff);
+  if(ATcutf != NULL)
+    trusted->tab_file_load(merf, load_AT_cutoffs());
+  else
+    trusted->tab_file_load(merf, cutoff);
 
   // learn nt->nt transitions
   double ntnt_prob[4][4] = {0};

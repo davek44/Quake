@@ -84,16 +84,16 @@ bool bithash::check(unsigned long long & kmermap, unsigned last, unsigned next) 
 // Make a prefix_tree from kmers in the file given that
 // occur >= "boundary" times
 ////////////////////////////////////////////////////////////
-void bithash::meryl_file_load(const char* merf, const int boundary) {
+void bithash::meryl_file_load(const char* merf, const double boundary) {
   ifstream mer_in(merf);
   string line;
-  int count;
+  double count;
   bool add_kmer = false;
 
   while(getline(mer_in, line)) {
     if(line[0] == '>') {
       // get count
-      count = atoi(line.substr(1).c_str());
+      count = atof(line.substr(1).c_str());
       //cout << count << endl;
       
       // compare to boundary
@@ -119,17 +119,17 @@ void bithash::meryl_file_load(const char* merf, const int boundary) {
 // Make a prefix_tree from kmers in the file given that
 // occur >= "boundary" times
 ////////////////////////////////////////////////////////////
-void bithash::tab_file_load(const char* merf, const int boundary) {
+void bithash::tab_file_load(const char* merf, const double boundary) {
   ifstream mer_in(merf);
   string line;
-  int count;
+  double count;
 
   while(getline(mer_in, line)) {
     if(line[k] != '\t')
       cout << "Kmers are not of expected length " << k << endl;
 
     // get count
-    count = atoi(line.substr(k+1).c_str());
+    count = atof(line.substr(k+1).c_str());
     //cout << count << endl;
       
     // compare to boundary
@@ -141,6 +141,54 @@ void bithash::tab_file_load(const char* merf, const int boundary) {
       add(binary_rckmer(line.substr(0,k)));
     }
   }
+}
+
+////////////////////////////////////////////////////////////
+// file_load
+//
+// Make a prefix_tree from kmers in the file given that
+// occur >= "boundary" times
+////////////////////////////////////////////////////////////
+void bithash::tab_file_load(const char* merf, const vector<double> boundary) {
+  ifstream mer_in(merf);
+  string line;
+  double count;
+  int at;
+
+  while(getline(mer_in, line)) {
+    if(line[k] != '\t') {
+      cerr << "Kmers are not of expected length " << k << endl;
+      exit(EXIT_FAILURE);
+    }
+
+    at = count_at(line.substr(0,k));
+
+    // get count
+    count = atof(line.substr(k+1).c_str());
+    //cout << count << endl;
+      
+    // compare to boundary
+    if(count >= boundary[at]) {
+      // add to tree
+      add(binary_kmer(line.substr(0,k)));
+
+      // add reverse to tree
+      add(binary_rckmer(line.substr(0,k)));
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////
+// count_at
+//
+// Count the A's and T's in the sequence given
+////////////////////////////////////////////////////////////
+int bithash::count_at(string seq) {
+  int at = 0;
+  for(int i = 0; i < seq.size(); i++)
+    if(seq[i] == 'A' || seq[i] == 'T')
+      at +=  1;
+  return at;
 }
 
 //  Convert string  s  to its binary equivalent in  mer .

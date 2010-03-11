@@ -7,15 +7,23 @@ import soap, shrec
 ############################################################
 # measure.py
 #
-#
+# Note that if the sequencing coverage is C, read lengths
+# are L and kmer size is k, the kmer coverage will be
+# cov*(L-k)/L.
 ############################################################
 
 refgenome_file = '/fs/szdata/ncbi/genomes/Bacteria/Helicobacter_pylori_G27/NC_011333.fna' # 1.65 Mb
-#errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
-errorprofile_file = '/nfshomes/dakelley/research/error_correction/data/turkey.fq'
+#refgenome_file = '/fs/szdata/ncbi/genomes/Bacteria/Escherichia_coli_536/NC_008253.fna' # 4.94 Mb
+
+errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
+read_length = 36
+#errorprofile_file = '/nfshomes/dakelley/research/error_correction/data/turkey.fq'
+#read_length = 75
+#errorprofile_file = '/fs/szattic-asmg4/Bees/Bombus_impatiens/s_1_1_sequence.txt'
+#read_length = 125
 
 proc = 4
-num_reads = 900000 # ~40x
+cov = 30
 kmer = 15
 rand_ntnt = False
 
@@ -25,6 +33,7 @@ rand_ntnt = False
 def main():
     parser = OptionParser()
     parser.add_option('-a', dest='accuracy', default=False, action='store_true', help='Just compute accuracy of existing read corrections')
+    parser.add_option('--no_sim', dest='no_sim', default=False, action='store_true', help='Use the current simulated reads')
     parser.add_option('--me', dest='me', default=False, action='store_true', help='Do my corrector')
     parser.add_option('--soap', dest='soap', default=False, action='store_true', help='Do SOAP')
     parser.add_option('--shrec', dest='shrec', default=False, action='store_true', help='Do SHREC')
@@ -37,26 +46,28 @@ def main():
     ########################################
     # generate test data
     ########################################
-    if not options.accuracy:
-        # load error profiles
-        err_profs = get_error_profiles(num_reads)
-
+    if not options.no_sim and not options.accuracy:
         # load genome
         genome_dict = dna.fasta2dict(refgenome_file)
+
+        # load error profiles
+        num_reads =  cov*len(genome_dict.values()[0]) / read_length
+        err_profs = get_error_profiles(num_reads)
 
         # make nt->nt transition matrix
         ntnt_matrix = make_ntntmatrix(rand_ntnt)
 
         # simulate reads
-        simulate_error_reads(genome_dict.values()[0], err_profs, ntnt_matrix)
-    
+        #simulate_error_reads(genome_dict.values()[0], err_profs, ntnt_matrix)
+        simulate_bias_error_reads(genome_dict.values()[0], err_profs, ntnt_matrix)
+
     ########################################
     # my correct
     ########################################
     if options.all or options.me:
         if not options.accuracy:
             # correct reads
-            os.system('time correct.py -r test_reads.fq -k %d -p %d' % (kmer,proc))
+            os.system('time correct.py -r test_reads.fq -k %d -p %d --no_count' % (kmer,proc))
 
         # compute accuracy
         my_accuracy()
@@ -185,7 +196,83 @@ def simulate_error_reads(genome, err_profs, ntnt_matrix):
         mseq = list(seq)
         for j in range(readlen):
             err_prob = math.pow(10.0,-(ord(err_profs[i][j])-33.0)/10.0)
-            if err_prob == 1.0:
+            if err_prob > .75:
+                mseq[j] = 'N'
+            elif random.random() < err_prob:
+                mseq[j] = myrand_choice(['A','C','G','T'],ntnt_matrix[nts[mseq[j]]])                    
+        mseq = ''.join(mseq)        
+
+        # print to fastq
+        header = '@read_'+str(i)
+        print >> reads_out, '%s\n%s\n+\n%s' % (header,mseq,err_profs[i])
+
+        if seq != mseq:
+            print >> info_out, '%s\t%s' % (header,seq)
+
+    reads_out.close()
+    info_out.close()
+
+
+############################################################
+# simulate_error_reads
+#
+# Randomly simulate a bunch of reads using the error
+# profiles given.  Only bother keeping those with errors
+# and save information about the errors in order to check.
+############################################################
+def simulate_bias_error_reads(genome, err_profs, ntnt_matrix):
+    interval_size = 1000
+    extreme_gc_discount = .25
+    readlen = len(err_profs[0])
+    nts = {'A':0, 'C':1, 'G':2, 'T':3}
+
+    # fragment genome
+    interval_starts = []
+    interv = 0
+    while interv < len(genome):
+        interval_starts.append(interv)
+        interv += interval_size
+
+    # count AT
+    interval_at = []
+    for i in range(len(interval_starts)):
+        if i < len(interval_starts)-1:
+            window = genome[interval_starts[i]:interval_starts[i+1]]
+        else:
+            window = genome[interval_starts[i]:]
+        interval_at.append(len([nt for nt in window if nt in ['A','T']]) / float(len(window)))
+
+    # calculate interval probs
+    a = extreme_gc_discount
+    b = 4 - 4*extreme_gc_discount
+    c = -4 + 4*extreme_gc_discount
+    interval_weights = [a + b*at + c*at*at for at in interval_at]
+    weights_sum = sum(interval_weights)
+    interval_probs = [w/weights_sum for w in interval_weights]
+
+    reads_out = open('test_reads.fq','w')
+    info_out = open('test_reads.info','w')
+
+    for i in range(len(err_profs)):
+        # choose interval
+        interval = myrand_choice(range(len(interval_starts)), interval_probs)
+
+        # simulate read
+        if interval < len(interval_starts)-1:
+            start = random.randint(interval_starts[interval], interval_starts[interval+1])
+        else:
+            start = random.randint(interval_starts[interval], len(genome)-readlen)
+        seq = genome[start:start+readlen]
+      
+        # reverse complement
+        if random.choice([True,False]):
+            seq = dna.rc(seq)
+
+        # mutate
+        mseq = list(seq)
+        for j in range(readlen):
+            err_prob = math.pow(10.0,-(ord(err_profs[i][j])-33.0)/10.0)
+            if err_prob > .75:
                 mseq[j] = 'N'
             elif random.random() < err_prob:
                 mseq[j] = myrand_choice(['A','C','G','T'],ntnt_matrix[nts[mseq[j]]])                    
@@ -222,6 +309,8 @@ def myrand_choice(vals, p):
     return ''
 
 
+
+
 ############################################################
 # accuracy
 #
@@ -242,6 +331,7 @@ def my_accuracy():
 
     # stats
     err_proper = 0
+    err_proper_trim = 0
     err_improper = 0
     err_improperf = open('err_improper.txt','w')
     err_toss = 0
@@ -251,6 +341,7 @@ def my_accuracy():
     ok_improperf = open('ok_improper.txt','w')
     ok_toss = 0
     ok_tossf = open('ok_toss.txt','w')
+    ok_trim = 0
 
     # get corrected reads
     for line in open('out.txt'):
@@ -258,16 +349,31 @@ def my_accuracy():
 
         if len(cseq) > 1:
             # read was corrected
-            if not error_reads.has_key(header):
-                ok_improper += 1
-                print >> ok_improperf, header
-            else:
-                if cseq == error_reads[header]:
-                    err_proper += 1
+            if len(cseq) == len(seq):
+                # not trimmed
+                if not error_reads.has_key(header):
+                    ok_improper += 1
+                    print >> ok_improperf, header
                 else:
-                    err_improper += 1
-                    print >> err_improperf, header
-                    
+                    if cseq == error_reads[header]:
+                        err_proper += 1
+                    else:
+                        err_improper += 1
+                        print >> err_improperf, header
+            else:
+                # trimmed
+                if not error_reads.has_key(header):
+                    ok_trim += 1
+                    if seq[:len(cseq)] != cseq:
+                        ok_improper += 1
+                else:
+                    if cseq == error_reads[header][:len(cseq)]:
+                        err_proper += 1
+                        err_proper_trim += 1
+                    else:
+                        err_improper += 1
+                        print >> err_improperf, header                        
+
         else:
             # read was thrown away
             if not error_reads.has_key(header):
@@ -284,11 +390,13 @@ def my_accuracy():
         print >> err_keptf, header
 
     print 'Error reads properly corrected\t%d' % err_proper
+    print 'Error reads trimmed and properly corrected\t%d' % err_proper_trim
     print 'Error reads improperly corrected\t%d' % err_improper
     print 'Error reads thrown away\t%d' % err_toss
     print 'Error reads ignored and kept\t%d' % err_kept
     print 'OK reads improperly corrected\t%d' % ok_improper
     print 'OK reads thrown away\t%d' % ok_toss
+    print 'OK reads trimmed\t%d' % ok_trim
     #print 'Bad reads: %d' % (err_improper+err_kept+ok_improper)
 
 

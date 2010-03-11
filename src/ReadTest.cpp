@@ -98,17 +98,6 @@ void ReadTest::testCheckTrust() {
 
 
 ////////////////////////////////////////////////////////////
-// testRealRead
-//
-// An H. pylori read that was corrected by Shrec
-////////////////////////////////////////////////////////////
-bool ReadTest::testRealRead() {
-  const char* header = ">@HWI-EAS440_63:6:1:1530:367"
-  const char* read = "GTTTTTTTACAGAAGAGAAATTTTTCAGAATGACTA"
-  const char* read = "TTCTTGTGATGGAAGAGAAATTTTTCAGAATGACTA";
-  
-
-////////////////////////////////////////////////////////////
 // vec_eq
 //
 // Return true if the vector exactly covers the given

@@ -10,7 +10,7 @@
 using namespace::std;
 
 //const int bitsize = 22;
-const int bitsize = 75;
+const int bitsize = 110;
 
 ////////////////////////////////////////////////////////////
 // correction
@@ -75,12 +75,17 @@ class Read {
   Read(const string & h, const unsigned int* s, const string & q, vector<int> & u, const int read_length);
   ~Read();
 
+  bool trim(int t);
   bool trim(int t, ofstream & out);
   bool correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning = false);
   bool single_correct(bithash* trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning = false);
   bool correct_subset(vector<int> untrusted_subset, bithash* trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning);
   vector<short> error_region(vector<int> untrusted_subset);
   bool check_trust(corrected_read *cr, bithash *trusted);
+  string print_seq();
+  //string print_corrected(corrected_read* cr);
+  string print_corrected(vector<correction> & cor);
+  string print_corrected(vector<correction> & cor, int print_nt);
 
 
   string header;
@@ -95,17 +100,15 @@ class Read {
   const static float correct_min_t = .00001;
   const static float learning_min_t = .005;
   static int trim_t;
+  static bool illumina_qual;
+  static bool output_reads;
 
  private:
   bool untrusted_intersect(vector<int> untrusted_subset, vector<short> & region);
   void untrusted_union(vector<int> untrusted_subset, vector<short> & region);
   void quality_quicksort(vector<short> & indexes, int left, int right);
-  string print_seq();
-  //string print_corrected(corrected_read* cr);
-  string print_corrected(vector<correction> & cor);
-  string print_corrected(vector<correction> & cor, int print_nt);
 
-  float likelihood;
+  float global_like;  // to track likelihood across components
 };
 
 #endif
