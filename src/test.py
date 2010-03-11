@@ -20,7 +20,7 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    num_reads = 50000
+    num_reads = 5000
     err_profs = get_error_profiles(num_reads, True)
 
     # make genome
@@ -39,8 +39,7 @@ def main():
     trusted_kmers(genome)
 
     # run ./correct
-    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 4')
-    os.system('cat out.txt? > out.txt')
+    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 1 2> out.txt')
 
     # compare corrected reads
     compare_corrections(err_reads, genome)
@@ -149,7 +148,7 @@ def compare_corrections(err_reads, genome):
 
         # corrected read
         if not err_reads.has_key(a[0]):
-            # already seen as ambiguous
+            # already seen as ambiguous or badnt forfeit
             continue
         er = err_reads[a[0]]
 

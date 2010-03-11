@@ -119,8 +119,7 @@ void bithash::meryl_file_load(const char* merf, const double boundary) {
 // Make a prefix_tree from kmers in the file given that
 // occur >= "boundary" times
 ////////////////////////////////////////////////////////////
-void bithash::tab_file_load(const char* merf, const double boundary) {
-  ifstream mer_in(merf);
+void bithash::tab_file_load(istream & mer_in, const double boundary) {
   string line;
   double count;
 
@@ -149,8 +148,7 @@ void bithash::tab_file_load(const char* merf, const double boundary) {
 // Make a prefix_tree from kmers in the file given that
 // occur >= "boundary" times
 ////////////////////////////////////////////////////////////
-void bithash::tab_file_load(const char* merf, const vector<double> boundary) {
-  ifstream mer_in(merf);
+void bithash::tab_file_load(istream & mer_in, const vector<double> boundary) {
   string line;
   double count;
   int at;

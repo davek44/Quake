@@ -21,8 +21,8 @@ class bithash {
   bool check(unsigned kmer[k], long long unsigned & kmermap);
   bool check(long long unsigned & kmermap, unsigned last, unsigned next);
   void meryl_file_load(const char* merf, const double boundary);
-  void tab_file_load(const char* merf, const double boundary);
-  void tab_file_load(const char* merf, const vector<double> boundary);
+  void tab_file_load(istream & mer_in, const double boundary);
+  void tab_file_load(istream & mer_in, const vector<double> boundary);
   long long unsigned binary_kmer(const string &s);
   long long unsigned binary_rckmer(const string &s);
   int num_kmers();
