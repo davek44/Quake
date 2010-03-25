@@ -23,6 +23,7 @@ def main():
     parser.add_option('-r', dest='readsf', help='Fastq file of reads')
     parser.add_option('-k', dest='k', type='int', help='Size of k-mers to correct')
     parser.add_option('-p', dest='proc', type='int', default=4, help='Number of processes')
+    parser.add_option('-I', dest='illumina_qual', action='store_true', default=False, help='Interpret quality values as Illumina base 64 (as opposed to 33)')
     parser.add_option('--no_count', dest='no_count', action='store_true', default=False, help='Kmers are already counted and in file expected')
     parser.add_option('--no_cut', dest='no_cut', action='store_true', default=False, help='Coverage model is optimized and cutoff is printed to file expected')
     (options, args) = parser.parse_args()
@@ -37,32 +38,34 @@ def main():
     else:
         ctsf = '%s.cts' % os.path.splitext( os.path.split(options.readsf)[1] )[0]
 
+    if options.illumina_qual:
+        options.illumina_qual = '-I'
+    else:
+        options.illumina_qual = ''
+
     if not options.no_count and not options.no_cut:
         #count_kmers_meryl(options.readsf, options.k, ctsf)
-        count_kmers_amos(options.readsf, options.k, ctsf)
+        count_kmers_amos(options.readsf, options.k, ctsf, options.illumina_qual)
 
     if not options.no_cut:
         # model coverage
         if qmers:
             if model_gc:
-                model_q_gc_cutoffs(ctsf, 20000)
+                model_q_gc_cutoffs(ctsf, 15000)
             else:
-                model_q_cutoff(ctsf, 30000)
+                model_q_cutoff(ctsf, 20000)
         else:
             model_cutoff(ctsf)
 
     if model_gc:
         # run correct C++ code
-        os.system('correct -r %s -m %s -a cutoffs.gc.txt -p %d' % (options.readsf, ctsf, options.proc))      
+        os.system('correct -r %s -m %s -a cutoffs.gc.txt -p %d %s' % (options.readsf, ctsf, options.proc, options.illumina_qual))
 
     else:
         cutoff = open('cutoff.txt').readline().rstrip()
 
         # run correct C++ code
-        os.system('correct -r %s -m %s -c %s -p %d' % (options.readsf, ctsf, cutoff, options.proc))
-
-    os.system('cat out.txt?* > out.txt')
-    os.system('rm out.txt?*')
+        os.system('correct -r %s -m %s -c %s -p %d %s' % (options.readsf, ctsf, cutoff, options.proc, options.illumina_qual))
 
 
 ############################################################
@@ -205,9 +208,9 @@ def count_kmers_meryl(readsf, k, ctsf, proc=1):
 #
 # Count kmers in the reads file using AMOS count-kmers
 ############################################################
-def count_kmers_amos(readsf, k, ctsf):
+def count_kmers_amos(readsf, k, ctsf, iq):
     kmerf = os.path.splitext( os.path.split(readsf)[1] )[0]
-    os.system('cat %s | count-kmers -k %d -S > %s' % (readsf, k, ctsf))
+    os.system('cat %s | count-kmers-q -k %d %s > %s' % (readsf, k, iq, ctsf))
     
             
 ############################################################

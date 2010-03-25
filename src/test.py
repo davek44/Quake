@@ -5,13 +5,21 @@ import math, random, os, dna
 # test.py
 #
 # Test my error correction program with simulated reads
+#
+# Notes:
+# -"Correction should have been made" can appear wrongly
+#   if a read has two errors and one of them lies in a 
+#   repetitive region such that some of its surrounding
+#   kmers are trusted by chance.
 ############################################################
 
-errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
+#errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
+errorprofile_file = '/nfshomes/dakelley/research/error_correction/data/ecoli/SRR001665_1.fastq'
 
 like_t = .00001
 like_spread_t = .1
 trimq = 3
+k = 19
 
 ############################################################
 # main
@@ -20,7 +28,7 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    num_reads = 5000
+    num_reads = 100000
     err_profs = get_error_profiles(num_reads, True)
 
     # make genome
@@ -31,6 +39,7 @@ def main():
     gf = open('genome.fa','w')
     gf.write('>genome\n%s\n' % genome)
     gf.close()
+    #genome = dna.fasta2dict('genome.fa').values()[0]
 
     # simulate reads
     err_reads = simulate_error_reads(genome, err_profs)
@@ -39,7 +48,14 @@ def main():
     trusted_kmers(genome)
 
     # run ./correct
-    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 1 2> out.txt')
+    #os.system('time ./build_bithash -m genome.cts -c 99 -o genome.bh.out')
+    #os.system('time ./correct -r err_reads.fq -m genome.bh.out -p 1 2> out.txt')
+
+    #os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 1 2> out.txt')
+    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 16')
+    #os.system('cat err_reads.fq | ./correct -r - -m genome.cts -c 99 -p 1 2> out.txt')
+
+    exit()
 
     # compare corrected reads
     compare_corrections(err_reads, genome)
@@ -107,10 +123,12 @@ def simulate_error_reads(genome, err_profs):
                     
         mseq = ''.join(mseq)
 
-        if mseq != seq:
+        if mseq != seq or True:
             header = '@'+str(i)
-            err_reads[header] = {'orig':seq, 'err':mseq, 'qual':err_profs[i]}
-            print >> reads_out, '%s\n%s\n+\n%s' % (header,mseq,err_profs[i])
+            #err_reads[header] = {'orig':seq, 'err':mseq, 'qual':err_profs[i]}
+            #print >> reads_out, '%s\n%s\n+\n%s' % (header,mseq,err_profs[i])
+            err_reads[header] = {'orig':dna.rc(seq), 'err':dna.rc(mseq), 'qual':err_profs[i][::-1]}
+            print >> reads_out, '%s\n%s\n+\n%s' % (header,dna.rc(mseq),err_profs[i][::-1])
 
     reads_out.close()
     return err_reads
@@ -124,9 +142,8 @@ def simulate_error_reads(genome, err_profs):
 ############################################################
 def trusted_kmers(genome):
     tkout = open('genome.cts','w')
-    for i in range(len(genome)-15):
-        #print >> tkout, '>100\n%s' % genome[i:i+15]
-        print >> tkout, '%s\t100.0' % genome[i:i+15]
+    for i in range(len(genome)-k):
+        print >> tkout, '%s\t100.0' % genome[i:i+k]
     tkout.close()
 
 ############################################################
@@ -280,8 +297,8 @@ def likelihood(actual_read, obs_read, quals):
 # genome.
 ############################################################
 def check_trust(seq, genome):
-    for i in range(len(seq)-15+1):
-        if genome.find(seq[i:i+15]) == -1 and genome.find(dna.rc(seq[i:i+15])) == -1:
+    for i in range(len(seq)-k+1):
+        if genome.find(seq[i:i+k]) == -1 and genome.find(dna.rc(seq[i:i+k])) == -1:
             return False
     return True
 

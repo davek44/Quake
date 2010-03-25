@@ -1,12 +1,22 @@
 #include <iostream>
-#include <math.h>
+#include <fstream>
 
 using namespace::std;
 
+void read_all(istream & in) {
+  string line;
+  while(getline(in, line))
+    //cout << line << endl;
+    int x = 3;
+}
+
 int main() {
-  int q = 3;
-  double p = 1.0-pow(10.0, -q/10.0);
-  cout << p << endl;
-  int q2 = floor(-10*log(1.0 - p)/log(10));
-  cout << q2 << endl;
+  streampos orig = cin.tellg();
+  cout << "orig: " << orig << endl;
+  read_all(cin);
+  cout << "after: " << cin.tellg() << endl;
+  cin.seekg(orig);
+  read_all(cin);
+
+  return 0;
 }

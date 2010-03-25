@@ -7,10 +7,10 @@
 #include <bitset>
 using namespace::std;
 
-const int k = 15;
-//const unsigned long bitssize = 274877906944; // i.e. 4^19
-const int bitssize = 1073741824;  // i.e. 4^15
-//const int bitssize = 67108864;  // i.e. 4^k
+const int k = 19;
+const unsigned long bitssize = 274877906944; // i.e. 4^19
+//const unsigned long bitssize = 17179869184; // i.e. 4^17
+//const unsigned long bitssize = 1073741824;  // i.e. 4^15
 
 class bithash {
  public:
@@ -25,7 +25,10 @@ class bithash {
   void tab_file_load(istream & mer_in, const vector<double> boundary);
   long long unsigned binary_kmer(const string &s);
   long long unsigned binary_rckmer(const string &s);
-  int num_kmers();
+  void binary_file_output(char* outf);
+  void binary_file_input(char* inf);
+  void binary_file_input_lowmem(char* inf);
+  unsigned int num_kmers();
 
  private:
   unsigned binary_nt(char ch);

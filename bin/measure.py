@@ -15,16 +15,18 @@ import soap, shrec
 refgenome_file = '/fs/szdata/ncbi/genomes/Bacteria/Helicobacter_pylori_G27/NC_011333.fna' # 1.65 Mb
 #refgenome_file = '/fs/szdata/ncbi/genomes/Bacteria/Escherichia_coli_536/NC_008253.fna' # 4.94 Mb
 
-errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
-read_length = 36
+#errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
+#read_length = 36
 #errorprofile_file = '/nfshomes/dakelley/research/error_correction/data/turkey.fq'
 #read_length = 75
-#errorprofile_file = '/fs/szattic-asmg4/Bees/Bombus_impatiens/s_1_1_sequence.txt'
-#read_length = 125
+errorprofile_file = '/fs/szattic-asmg4/Bees/Bombus_impatiens/s_3_1_sequence.txt'
+read_length = 125
 
-proc = 4
-cov = 30
-kmer = 15
+illumina_qual = '-I'
+
+proc = 32
+cov = 60
+kmer = 19
 rand_ntnt = False
 
 ############################################################
@@ -58,8 +60,8 @@ def main():
         ntnt_matrix = make_ntntmatrix(rand_ntnt)
 
         # simulate reads
-        #simulate_error_reads(genome_dict.values()[0], err_profs, ntnt_matrix)
-        simulate_bias_error_reads(genome_dict.values()[0], err_profs, ntnt_matrix)
+        simulate_error_reads(genome_dict.values()[0], err_profs, ntnt_matrix)
+        #simulate_bias_error_reads(genome_dict.values()[0], err_profs, ntnt_matrix)
 
     ########################################
     # my correct
@@ -67,7 +69,7 @@ def main():
     if options.all or options.me:
         if not options.accuracy:
             # correct reads
-            os.system('time correct.py -r test_reads.fq -k %d -p %d --no_count' % (kmer,proc))
+            os.system('time correct.py -r test_reads.fq -k %d -p %d %s' % (kmer,proc,illumina_qual))
 
         # compute accuracy
         my_accuracy()
@@ -195,7 +197,11 @@ def simulate_error_reads(genome, err_profs, ntnt_matrix):
         # mutate
         mseq = list(seq)
         for j in range(readlen):
-            err_prob = math.pow(10.0,-(ord(err_profs[i][j])-33.0)/10.0)
+            if illumina_qual:
+                err_prob = math.pow(10.0,-(ord(err_profs[i][j])-64.0)/10.0)
+            else:
+                err_prob = math.pow(10.0,-(ord(err_profs[i][j])-33.0)/10.0)
+
             if err_prob > .75:
                 mseq[j] = 'N'
             elif random.random() < err_prob:
@@ -309,8 +315,6 @@ def myrand_choice(vals, p):
     return ''
 
 
-
-
 ############################################################
 # accuracy
 #
@@ -323,6 +327,104 @@ def myrand_choice(vals, p):
 # 6. OK reads thrown away.
 ############################################################
 def my_accuracy():
+    # get observed reads
+    obs_reads = {}
+    f = open('test_reads.fq')
+    header = f.readline().rstrip()
+    while header:
+        seq = f.readline().rstrip()
+        mid = f.readline().rstrip()
+        qual = f.readline().rstrip()
+        obs_reads[header] = seq
+        header = f.readline().rstrip()        
+
+    # get actual error reads
+    error_reads = {}
+    for line in open('test_reads.info'):
+        a = line.split()
+        error_reads[a[0]] = a[1]
+
+    # stats
+    err_proper = 0
+    err_proper_trim = 0
+    err_improper = 0
+    err_improperf = open('err_improper.txt','w')
+    err_toss = 0
+    err_kept = 0
+    err_keptf = open('err_kept.txt','w')
+    ok_improper = 0
+    ok_improperf = open('ok_improper.txt','w')
+    ok_toss = 0
+    ok_tossf = open('ok_toss.txt','w')
+    ok_trim = 0
+
+    # get corrected reads
+    fqf = open('test_reads.cor.fq')
+    header = fqf.readline().rstrip()
+    while header:
+        seq = fqf.readline().rstrip()
+        mid = fqf.readline().rstrip()
+        qual = fqf.readline().rstrip()
+
+        oseq = obs_reads[header]
+
+        if seq != oseq:
+            # read was corrected
+            if len(seq) == len(oseq):
+                # not trimmed
+                if not error_reads.has_key(header):
+                    ok_improper += 1
+                    print >> ok_improperf, header
+                else:
+                    if seq == error_reads[header]:
+                        err_proper += 1
+                    else:
+                        err_improper += 1
+                        print >> err_improperf, header
+            else:
+                # trimmed
+                if not error_reads.has_key(header):
+                    ok_trim += 1
+                    if oseq[:len(seq)] != seq:
+                        ok_improper += 1
+                        print >> ok_improperf, header
+                else:
+                    if seq == error_reads[header][:len(seq)]:
+                        err_proper += 1
+                        err_proper_trim += 1
+                    else:
+                        err_improper += 1
+                        print >> err_improperf, header
+        else:
+            # read was not corrected
+            if error_reads.has_key(header):
+                err_kept += 1
+                print >> err_keptf, header
+
+        del obs_reads[header]
+        if error_reads.has_key(header):
+            del error_reads[header]
+
+        header = fqf.readline().rstrip()
+
+    err_toss = len(error_reads)
+    ok_toss = len(obs_reads) - err_toss
+    for header in obs_reads:
+        if not error_reads.has_key(header):
+            print >> ok_tossf, header
+
+    print 'Error reads properly corrected\t%d' % err_proper
+    print 'Error reads trimmed and properly corrected\t%d' % err_proper_trim
+    print 'Error reads improperly corrected\t%d' % err_improper
+    print 'Error reads thrown away\t%d' % err_toss
+    print 'Error reads ignored and kept\t%d' % err_kept
+    print 'OK reads improperly corrected\t%d' % ok_improper
+    print 'OK reads thrown away\t%d' % ok_toss
+    print 'OK reads trimmed\t%d' % ok_trim
+    #print 'Bad reads: %d' % (err_improper+err_kept+ok_improper)
+
+    
+def my_old_accuracy():
     # get actual error reads
     error_reads = {}
     for line in open('test_reads.info'):

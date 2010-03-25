@@ -182,12 +182,7 @@ static void parse_command_line(int argc, char **argv) {
 
   ////////////////////////////////////////
   // correct user input errors
-  ////////////////////////////////////////  
-  if(cutoff == 0 && ATcutf == NULL) {
-    cerr << "Must provide a trusted/untrusted kmer cutoff (-c) or a file containing the cutoff as a function of the AT content (-a)" << endl;
-    exit(EXIT_FAILURE);
-  }
-
+  ////////////////////////////////////////
   if(fastqf == NULL && file_of_fastqf == NULL) {
     cerr << "Must provide a fastq file of reads (-r) or a file containing a list of fastq files of reads (-f)" << endl;
     exit(EXIT_FAILURE);
@@ -202,18 +197,18 @@ static void parse_command_line(int argc, char **argv) {
 ////////////////////////////////////////////////////////////
 // pa_params
 ////////////////////////////////////////////////////////////
-void pa_params(string fqf, vector<streampos> & starts, vector<streampos> & counts) {
+void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long> & counts) {
   // count number of sequences
-  int N = 0;
+  unsigned long long N = 0;
   ifstream reads_in(fqf.c_str());
   string toss;
   while(getline(reads_in, toss))
     N++;
   reads_in.close();
-  N /= 4;
+  N /= 4ULL;
 
   // determine counts per thread
-  int sum = 0;
+  unsigned long long sum = 0;
   for(int i = 0; i < threads-1; i++) {
     counts.push_back(N / threads);
     sum += N/threads;
@@ -223,8 +218,8 @@ void pa_params(string fqf, vector<streampos> & starts, vector<streampos> & count
   // find start points
   reads_in.open(fqf.c_str());
   starts.push_back(reads_in.tellg());
-  int s = 0;
-  int t = 0;
+  unsigned long long s = 0;
+  unsigned int t = 0;
   while(getline(reads_in,toss)) {
     // sequence
     getline(reads_in, toss);
@@ -276,23 +271,35 @@ static void combine_output(const char* outf) {
 ////////////////////////////////////////////////////////////
 // correct_reads
 ////////////////////////////////////////////////////////////
-static void correct_reads(string fqf, bithash * trusted, vector<streampos> & starts, vector<streampos> & counts, double (&ntnt_prob)[4][4]) {
+static void correct_reads(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4]) {
   // format output file
   int suffix_index = fqf.rfind(".");
   string prefix = fqf.substr(0,suffix_index);
   string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
   string outf = prefix + string(".cor") + suffix;
   //cout << outf << endl;
+  
+  for(int i = 0; i < threads; i++)
+    cout << i << " " << counts[i] << endl;
 
 #pragma omp parallel //shared(trusted)
   {
     int tid = omp_get_thread_num();
+    
+    string toutf(outf);
+    stringstream tconvert;
+    tconvert << tid;
+    toutf += tconvert.str();
+    ofstream reads_out(toutf.c_str());
 
+    /*
     char* toutf = strdup(outf.c_str());
     char strtid[10];
     sprintf(strtid,"%d",tid);
     strcat(toutf, strtid);
+    cout << toutf << endl;
     ofstream reads_out(toutf);
+    */
 
     ifstream reads_in(fqf.c_str());
     reads_in.seekg(starts[tid]);
@@ -301,9 +308,9 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
     char* nti;
     Read *r;
 
-    int tcount = 0;
+    unsigned long long tcount = 0;
     while(getline(reads_in, header)) {
-      //cout << header << endl;
+      //cout << tid << " " << header << endl;
 
       // get sequence
       getline(reads_in, ntseq);
@@ -399,9 +406,10 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
 // to count the nt->nt errors and learn the errors
 // probabilities
 ////////////////////////////////////////////////////////////
-static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<streampos> & counts, double (&ntnt_prob)[4][4]) {
+static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4]) {
   int ntnt_counts[4][4] = {0};
   unsigned int samples = 0;
+
 #pragma omp parallel //shared(trusted)
   {
     int tid = omp_get_thread_num();
@@ -414,7 +422,7 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
     Read *r;    
     //correction* cor;
 
-    int tcount = 0;
+    unsigned long long tcount = 0;
     while(getline(reads_in, header)) {
       //cout << header << endl;
 
@@ -598,6 +606,28 @@ void zip_fastq(const char* fqf) {
 }
 
 ////////////////////////////////////////////////////////////
+// is_kmer_file
+//
+// Return true if the file is in the format "kmer\tcount",
+// else its probably a binary bithash dump file.
+////////////////////////////////////////////////////////////
+bool is_kmer_file(char* f) {
+  ifstream f_in(f);
+  string line;
+  getline(f_in, line);
+
+  char nt;
+  for(int i = 0; i < 5; i++) {
+    nt = line[0];
+    if(!(nt == 'A' || nt == 'C' || nt == 'G' || nt == 'T')) {
+      cout << "Reading -m file as bithash binary" << endl;
+      return false;
+    }
+  }
+  return true;
+}
+
+////////////////////////////////////////////////////////////
 // main
 ////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
@@ -608,21 +638,31 @@ int main(int argc, char **argv) {
 
   // make trusted kmer data structure
   bithash *trusted = new bithash();
-  cout << merf << endl;
-  if(ATcutf != NULL) {
-    if(strcmp(merf,"-") == 0)
-      trusted->tab_file_load(cin, load_AT_cutoffs());
-    else {
-      ifstream mer_in(merf);
-      trusted->tab_file_load(mer_in, load_AT_cutoffs());
+  if(is_kmer_file(merf)) {
+    if(cutoff == 0 && ATcutf == NULL) {
+      cerr << "Must provide a trusted/untrusted kmer cutoff (-c) or a file containing the cutoff as a function of the AT content (-a)" << endl;
+      exit(EXIT_FAILURE);
+    }
+
+    if(ATcutf != NULL) {
+      if(strcmp(merf,"-") == 0)
+	trusted->tab_file_load(cin, load_AT_cutoffs());
+      else {
+	ifstream mer_in(merf);
+	trusted->tab_file_load(mer_in, load_AT_cutoffs());
+      }
+    } else {
+      if(strcmp(merf,"-") == 0) {
+	trusted->tab_file_load(cin, cutoff);
+      } else {
+	ifstream mer_in(merf);
+	trusted->tab_file_load(mer_in, cutoff);
+      }
     }
   } else {
-    if(strcmp(merf,"-") == 0) {
-      trusted->tab_file_load(cin, cutoff);
-    } else {
-      ifstream mer_in(merf);
-      trusted->tab_file_load(mer_in, cutoff);
-    }
+    // from from file
+    trusted->binary_file_input_lowmem(merf);
+    cout << trusted->num_kmers() << " trusted kmers" << endl;
   }
 
   // make list of files
@@ -642,12 +682,14 @@ int main(int argc, char **argv) {
     fqf = fastqfs[f];
     cout << fqf << endl;
 
-    if(zipd != NULL)
+    if(zipd != NULL) {
       unzip_fastq(fqf.c_str());
+      fqf = fqf.substr(0, fqf.size()-3);
+    }
 
     // split file
     vector<streampos> starts;
-    vector<streampos> counts;
+    vector<unsigned long long> counts;
     pa_params(fqf, starts, counts);
 
     // learn nt->nt transitions
@@ -658,7 +700,7 @@ int main(int argc, char **argv) {
 	  ntnt_prob[i][j] = 1.0/3.0;
       }
     }
-    //learn_errors(fqf, trusted, starts, counts, ntnt_prob);
+    learn_errors(fqf, trusted, starts, counts, ntnt_prob);
 
     cout << "New error matrix:" << endl;
     cout << "\tA\tC\tG\tT" << endl;

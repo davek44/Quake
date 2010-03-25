@@ -124,12 +124,14 @@ bool Read::single_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[
 //
 // Corrections can be accessed through 'trusted_read'
 ////////////////////////////////////////////////////////////
-bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, double (&ntnt_prob)[4][4], bool learning) {
+bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, double (&ntnt_prob)[4][4], bool learning) {  
   /*
-  cout << "Untrusted: " << untrusted_subset.size() << endl;
-  for(int i = 0; i < untrusted_subset.size(); i++)
-    cout << untrusted_subset[i] << " ";
-  cout << endl;
+  if(header == "@19732") {
+    cout << "Untrusted: " << untrusted_subset.size() << endl;
+    for(int i = 0; i < untrusted_subset.size(); i++)
+      cout << untrusted_subset[i] << " ";
+    cout << endl;
+  }
   */
 
   // determine region to consider
@@ -268,6 +270,23 @@ bool Read::correct_subset(vector<int> untrusted_subset, bithash *trusted, double
 	break;
       }
     }
+    
+    /*
+    if(header == "@19732") {
+      cout << cr->likelihood << "\t";
+      for(int c = 0; c < cr->corrections.size(); c++) {
+	cout << " (" << cr->corrections[c].index << "," << cr->corrections[c].to << ")";
+      }
+      cout << "\t";
+      for(int c = 0; c < read_length; c++) {
+	if(cr->untrusted[c])
+	  cout << 1;
+	else
+	  cout << 0;
+      }
+      cout << endl;
+    }
+    */
     
     // if untrusted sharply increases, just bail
     if(((signed int)cr->untrusted.count() - untrusted_count) < k/3) {    
@@ -564,9 +583,7 @@ void Read::quality_quicksort(vector<short> & indexes, int left, int right) {
 // trusted kmers, update the corrected_reads's vector
 // of untrusted kmers and return true if it's now empty
 ////////////////////////////////////////////////////////////
-//bool Read::check_trust(corrected_read *cr, prefix_tree *trusted) {
 bool Read::check_trust(corrected_read *cr, bithash *trusted) {
-//bool Read::check_trust(corrected_read *cr, dawg *trusted) {
   // original read HAS errors
   if(cr->corrections.empty())
     return false;
@@ -583,24 +600,28 @@ bool Read::check_trust(corrected_read *cr, bithash *trusted) {
   int kmer_start = max(0, edit-k+1);
   int kmer_end = min(edit, read_length-k);
 
-  // check affected kmers
-  long long unsigned kmermap;
-  // check first kmer and save map value
-  cr->untrusted.set(kmer_start, !trusted->check(&seq[kmer_start], kmermap));
-  for(i = kmer_start+1; i <= kmer_end; i++) {
-    // check kmer using map value
-    cr->untrusted.set(i, !trusted->check(kmermap, seq[i-1], seq[i+k-1]));
-  }
+  bool non_acgt = false;
+  for(i = kmer_start; i < kmer_end+k; i++)
+    if(seq[i] >=4)
+      non_acgt = true;
 
-  // non-bithash way
-  /*
-  for(i = kmer_start; i <= kmer_end; i++) {
-    // check kmer
-    if(!trusted->check(&seq[i]))
-      cr->untrusted.push_back(i);
-      //old_untrusted.push_back(i);
+  non_acgt = true;
+  if(non_acgt) {
+    // easier to just check kmers one by one
+    for(i = kmer_start; i <= kmer_end; i++)
+      // check kmer
+      cr->untrusted.set(i, !trusted->check(&seq[i]));
+
+  } else {
+    // check affected kmers
+    long long unsigned kmermap;
+    // check first kmer and save map value  
+    cr->untrusted.set(kmer_start, !trusted->check(&seq[kmer_start], kmermap));
+    for(i = kmer_start+1; i <= kmer_end; i++) {
+      // check kmer using map value
+      cr->untrusted.set(i, !trusted->check(kmermap, seq[i-1], seq[i+k-1]));
+    }
   }
-  */ 
 
   // fix sequence
   for(i = 0; i < cr->corrections.size(); i++)

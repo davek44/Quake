@@ -76,8 +76,7 @@ def accuracy(infof, corf):
                 ok_toss += 1
 
             exp_read_id += 1
-            skip_read_id = '@read_%d' % exp_read_id
-            
+            skip_read_id = '@read_%d' % exp_read_id            
 
         if header.find('no error found') != -1:
             # read was allowed

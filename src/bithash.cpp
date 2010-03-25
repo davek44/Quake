@@ -26,6 +26,8 @@ void bithash::add(unsigned long long kmer) {
 // check
 //
 // Check for the presence of a sequence in the tree
+//
+// Can handle N's!  Returns False!
 ////////////////////////////////////////////////////////////
 bool bithash::check(unsigned kmer[k]) {
   unsigned long long kmermap = 0;
@@ -36,7 +38,6 @@ bool bithash::check(unsigned kmer[k]) {
     } else
       return false;
   }
-
   return bits[kmermap];
 }
 
@@ -45,6 +46,8 @@ bool bithash::check(unsigned kmer[k]) {
 //
 // Check for the presence of a sequence in the tree.
 // Pass the kmer map value back by reference to be re-used
+//
+// Can't handle N's!
 ////////////////////////////////////////////////////////////
 bool bithash::check(unsigned kmer[k], unsigned long long & kmermap) {
   kmermap = 0;
@@ -52,10 +55,11 @@ bool bithash::check(unsigned kmer[k], unsigned long long & kmermap) {
     if(kmer[i] < 4) {
       kmermap <<= 2;
       kmermap |= kmer[i];
-    } else
-      return false;
+    } else {
+      cerr << "Non-ACGT given to bithash::check" << endl;
+      exit(EXIT_FAILURE);
+    }
   }
-
   return bits[kmermap];
 }
 
@@ -64,16 +68,18 @@ bool bithash::check(unsigned kmer[k], unsigned long long & kmermap) {
 //
 // Check for the presence of a sequence in the tree.
 // Pass the kmer map value back by reference to be re-used
+//
+// Can't handle N's!
 ////////////////////////////////////////////////////////////
 bool bithash::check(unsigned long long & kmermap, unsigned last, unsigned next) {
-  if(next >= 4)
-    return false;
-  else {
+  if(next >= 4) {
+    cerr << "Non-ACGT given to bithash::check" << endl;
+    exit(EXIT_FAILURE);
+  } else {
     kmermap <<= 2;
     kmermap &= mask;
     kmermap |= next;
   }
-
   return bits[kmermap];
 }
 
@@ -124,8 +130,10 @@ void bithash::tab_file_load(istream & mer_in, const double boundary) {
   double count;
 
   while(getline(mer_in, line)) {
-    if(line[k] != '\t')
-      cout << "Kmers are not of expected length " << k << endl;
+    if(line[k] != '\t') {
+      cerr << "Kmers are not of expected length " << k << endl;
+      exit(EXIT_FAILURE);
+    }
 
     // get count
     count = atof(line.substr(k+1).c_str());
@@ -177,6 +185,103 @@ void bithash::tab_file_load(istream & mer_in, const vector<double> boundary) {
 }
 
 ////////////////////////////////////////////////////////////
+// binary_file_output
+//
+// Write bithash to file in binary format
+////////////////////////////////////////////////////////////
+void bithash::binary_file_output(char* outf) {
+  unsigned long long mysize = (unsigned long long)bits.size() / 8ULL;
+  char* buffer = new char[mysize];
+  unsigned int flag = 1;
+  for(unsigned long long i = 0; i < mysize; i++) {
+    unsigned int temp = 0;
+    for(unsigned int j = 0; j < 8; j++) { // read 8 bits from the bitset
+      temp <<= 1;
+      //unsigned int tmp = i*8 + j;
+      //cout << tmp << ",";
+      if(bits[i*8 + j])
+	temp |= flag;
+    }
+    buffer[i] = (char)temp;
+  }
+  ofstream ofs(outf, ios::out | ios::binary);
+  ofs.write(buffer, mysize);
+  ofs.close();
+}
+
+////////////////////////////////////////////////////////////
+// binary_file_input
+//
+// Read bithash from file in binary format
+////////////////////////////////////////////////////////////
+void bithash::binary_file_input(char* inf) {
+  ifstream ifs(inf, ios::binary);
+
+  // get size of file
+  ifs.seekg(0,ifstream::end);
+  unsigned long long mysize = ifs.tellg();
+  ifs.seekg(0);
+
+  // allocate memory for file content
+  char* buffer = new char[mysize];
+
+  // read content of ifs
+  ifs.read (buffer, mysize);
+
+  // parse bits
+  unsigned int flag = 128;
+  unsigned int temp;
+  for(unsigned long i = 0; i < mysize; i++) {
+    temp = (unsigned int)buffer[i];
+    for(unsigned int j = 0; j < 8; j++) {
+      if((temp & flag) == flag)
+	bits.set(i*8 + j);
+      temp <<= 1;
+    }
+  }
+
+  delete[] buffer;
+}
+
+////////////////////////////////////////////////////////////
+// binary_file_input
+//
+// Read bithash from file in binary format
+////////////////////////////////////////////////////////////
+void bithash::binary_file_input_lowmem(char* inf) {
+  unsigned int flag = 128;
+  unsigned int temp;
+
+  ifstream ifs(inf, ios::binary);
+
+  // get size of file
+  ifs.seekg(0,ifstream::end);
+  unsigned long long mysize = ifs.tellg();
+  ifs.seekg(0);
+
+  // allocate memory for file content
+  const unsigned long long buffersize = 268435456;  // i.e. 4^14, 32 MB
+  char* buffer = new char[buffersize];
+
+  for(unsigned long long b = 0; b < mysize/buffersize; b++) {
+    // read content of ifs
+    ifs.read (buffer, buffersize);
+
+    // parse bits
+    for(unsigned long long i = 0; i < buffersize; i++) {
+      temp = (unsigned int)buffer[i];
+      for(int j = 0; j < 8; j++) {
+	if((temp & flag) == flag)
+	  bits.set((buffersize*b + i)*8 + j);
+	temp <<= 1;
+      }
+    }
+  }
+
+  delete[] buffer;
+}
+
+////////////////////////////////////////////////////////////
 // count_at
 //
 // Count the A's and T's in the sequence given
@@ -222,6 +327,6 @@ unsigned bithash::binary_nt(char ch) {
 }
 
 
-int bithash::num_kmers() {
-  return (int)bits.count();
+unsigned int bithash::num_kmers() {
+  return (unsigned int)bits.count();
 }
