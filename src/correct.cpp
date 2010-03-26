@@ -41,7 +41,7 @@ static bool contrail_out = false;
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
-#define TESTING false
+#define TESTING true
 static const char* nts = "ACGTN";
 
 static void  Usage
@@ -279,9 +279,6 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
   string outf = prefix + string(".cor") + suffix;
   //cout << outf << endl;
   
-  for(int i = 0; i < threads; i++)
-    cout << i << " " << counts[i] << endl;
-
 #pragma omp parallel //shared(trusted)
   {
     int tid = omp_get_thread_num();
@@ -396,7 +393,7 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
     reads_in.close();
   }
   
-  combine_output(outf.c_str());
+  //combine_output(outf.c_str());
 }
 
 ////////////////////////////////////////////////////////////

@@ -6,7 +6,7 @@
 #include <set>
 #include <queue>
 
-#define TESTING false
+#define TESTING true
 #define DEBUG false
 
 ////////////////////////////////////////////////////////////
@@ -605,7 +605,7 @@ bool Read::check_trust(corrected_read *cr, bithash *trusted) {
     if(seq[i] >=4)
       non_acgt = true;
 
-  non_acgt = true;
+  //non_acgt = true;
   if(non_acgt) {
     // easier to just check kmers one by one
     for(i = kmer_start; i <= kmer_end; i++)

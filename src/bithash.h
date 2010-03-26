@@ -26,6 +26,7 @@ class bithash {
   long long unsigned binary_kmer(const string &s);
   long long unsigned binary_rckmer(const string &s);
   void binary_file_output(char* outf);
+
   void binary_file_input(char* inf);
   void binary_file_input_lowmem(char* inf);
   unsigned int num_kmers();

@@ -15,6 +15,9 @@ import math, random, os, dna
 
 #errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
 errorprofile_file = '/nfshomes/dakelley/research/error_correction/data/ecoli/SRR001665_1.fastq'
+#errorprofile_file = '/fs/szattic-asmg4/Bees/Bombus_impatiens/s_3_1_sequence.txt'
+read_len = 36
+illumina_qual = False
 
 like_t = .00001
 like_spread_t = .1
@@ -28,12 +31,12 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    num_reads = 100000
-    err_profs = get_error_profiles(num_reads, True)
+    num_reads = 5000
+    err_profs = get_error_profiles(num_reads, False)
 
     # make genome
     genome = ''
-    genome_size = 100000
+    genome_size = 10000
     for i in range(genome_size):
         genome += random.choice(['A','C','G','T'])
     gf = open('genome.fa','w')
@@ -51,11 +54,10 @@ def main():
     #os.system('time ./build_bithash -m genome.cts -c 99 -o genome.bh.out')
     #os.system('time ./correct -r err_reads.fq -m genome.bh.out -p 1 2> out.txt')
 
-    #os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 1 2> out.txt')
-    os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 16')
-    #os.system('cat err_reads.fq | ./correct -r - -m genome.cts -c 99 -p 1 2> out.txt')
-
-    exit()
+    if illumina_qual:
+        os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -I -p 1 2> out.txt')
+    else:
+        os.system('time ./correct -r err_reads.fq -m genome.cts -c 99 -p 1 2> out.txt')
 
     # compare corrected reads
     compare_corrections(err_reads, genome)
@@ -102,13 +104,16 @@ def simulate_error_reads(genome, err_profs):
     err_reads = {}
     for i in range(len(err_profs)):
         # simulate read
-        start = random.randint(0, len(genome)-36)
-        seq = genome[start:start+36]
+        start = random.randint(0, len(genome)-read_len)
+        seq = genome[start:start+read_len]
 
         # mutate
         mseq = list(seq)
-        for j in range(36):
-            err_prob = math.pow(10.0,-(ord(err_profs[i][j])-33.0)/10.0)
+        for j in range(read_len):
+            if illumina_qual:
+                err_prob = math.pow(10.0,-(ord(err_profs[i][j])-64.0)/10.0)
+            else:
+                err_prob = math.pow(10.0,-(ord(err_profs[i][j])-33.0)/10.0)
             if err_prob > .75:
                 mseq[j] = 'N'
             elif random.random() < err_prob:
@@ -283,7 +288,10 @@ def likelihood(actual_read, obs_read, quals):
     like = 1.0
     for i in range(len(actual_read)):
         if actual_read[i] != obs_read[i]:
-            obs_q = max(.25, 1.0 - math.pow(10.0,-(ord(quals[i])-33.0)/10.0))
+            if illumina_qual:
+                obs_q = max(.25, 1.0 - math.pow(10.0,-(ord(quals[i])-64.0)/10.0))
+            else:
+                obs_q = max(.25, 1.0 - math.pow(10.0,-(ord(quals[i])-33.0)/10.0))
             change_q = (1.0 - obs_q) / 3.0
             
             like *= change_q / obs_q
@@ -317,7 +325,10 @@ def check_trim(seq, error_read):
     for i in range(len(error_read['qual'])):
         score = 0
         for q in range(i,len(error_read['qual'])):
-            score += (trimq - (ord(error_read['qual'][q])-33))
+            if illumina_qual:
+                score += (trimq - (ord(error_read['qual'][q])-64))
+            else:
+                score += (trimq - (ord(error_read['qual'][q])-33))
         #print '%d: %d' % (i,score)
         if score >= max_score:
             max_score = score
