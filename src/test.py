@@ -14,13 +14,13 @@ import math, random, os, dna
 ############################################################
 
 #errorprofile_file = '/nfshomes/dakelley/research/hpylori/data/reads/HPKX_1039_AG0C1.1.fq'
-errorprofile_file = '/nfshomes/dakelley/research/error_correction/data/ecoli/SRR001665_1.fastq'
-#errorprofile_file = '/fs/szattic-asmg4/Bees/Bombus_impatiens/s_3_1_sequence.txt'
-read_len = 36
-illumina_qual = False
+#errorprofile_file = '/nfshomes/dakelley/research/error_correction/data/ecoli/SRR001665_1.fastq'
+errorprofile_file = '/fs/szattic-asmg4/Bees/Bombus_impatiens/s_3_1_sequence.txt'
+read_len = 124
+illumina_qual = True
 
 like_t = .00001
-like_spread_t = .1
+like_spread_t = .2
 trimq = 3
 k = 19
 
@@ -31,12 +31,12 @@ def main():
     print 'REMEBER YOU HAVE TO CHANGE THE OUTPUT FROM [-,.]\'S TO PRINTING AMBIGUOUS CORRECTED READS'
 
     # get error profiles
-    num_reads = 5000
+    num_reads = 50000
     err_profs = get_error_profiles(num_reads, False)
 
     # make genome
     genome = ''
-    genome_size = 10000
+    genome_size = 100000
     for i in range(genome_size):
         genome += random.choice(['A','C','G','T'])
     gf = open('genome.fa','w')
@@ -130,10 +130,8 @@ def simulate_error_reads(genome, err_profs):
 
         if mseq != seq or True:
             header = '@'+str(i)
-            #err_reads[header] = {'orig':seq, 'err':mseq, 'qual':err_profs[i]}
-            #print >> reads_out, '%s\n%s\n+\n%s' % (header,mseq,err_profs[i])
-            err_reads[header] = {'orig':dna.rc(seq), 'err':dna.rc(mseq), 'qual':err_profs[i][::-1]}
-            print >> reads_out, '%s\n%s\n+\n%s' % (header,dna.rc(mseq),err_profs[i][::-1])
+            err_reads[header] = {'orig':seq, 'err':mseq, 'qual':err_profs[i]}
+            print >> reads_out, '%s\n%s\n+\n%s' % (header,mseq,err_profs[i])
 
     reads_out.close()
     return err_reads
@@ -147,7 +145,7 @@ def simulate_error_reads(genome, err_profs):
 ############################################################
 def trusted_kmers(genome):
     tkout = open('genome.cts','w')
-    for i in range(len(genome)-k):
+    for i in range(len(genome)-k+1):
         print >> tkout, '%s\t100.0' % genome[i:i+k]
     tkout.close()
 
@@ -332,16 +330,26 @@ def check_trim(seq, error_read):
         #print '%d: %d' % (i,score)
         if score >= max_score:
             max_score = score
-            BWA_trim = i
+            BWA_trim = i    
 
     #print len(seq)
     #print BWA_trim
     trim_pt = len(seq)
     if trim_pt == BWA_trim:
         return True
-    elif error_read['orig'][trim_pt] != error_read['err'][trim_pt]:
+
+    elif error_read['orig'][trim_pt+k-1] != error_read['err'][trim_pt+k-1]:
         return True
+
     else:
+        print 'Quaec trim: %d' % trim_pt
+        print 'BWA trim: %d' % BWA_trim
+        print 'Error trims: ',
+        for i in range(BWA_trim):
+            if error_read['orig'][i] != error_read['err'][i]:
+                print '%d,' % (i-k+1),
+        print ''
+        
         return False
 
 

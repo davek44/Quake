@@ -1,5 +1,5 @@
 CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
-CFLAGS=-O3 -pg -fopenmp
+CFLAGS=-O3 -fopenmp
 CPPUNIT_PATH = /fs/sz-user-supported/Linux-x86_64
 
 .PHONY: all clean

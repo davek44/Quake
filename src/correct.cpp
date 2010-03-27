@@ -41,7 +41,7 @@ static bool contrail_out = false;
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
-#define TESTING true
+#define TESTING false
 static const char* nts = "ACGTN";
 
 static void  Usage
@@ -697,7 +697,7 @@ int main(int argc, char **argv) {
 	  ntnt_prob[i][j] = 1.0/3.0;
       }
     }
-    learn_errors(fqf, trusted, starts, counts, ntnt_prob);
+    //learn_errors(fqf, trusted, starts, counts, ntnt_prob);
 
     cout << "New error matrix:" << endl;
     cout << "\tA\tC\tG\tT" << endl;

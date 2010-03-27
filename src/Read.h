@@ -79,9 +79,10 @@ class Read {
   //bool trim(int t, ofstream & out);
   string correct(bithash *trusted, double (&ntnt_prob)[4][4], bool learning = false);
   //bool single_correct(bithash* trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning = false);
-  bool correct_subset(vector<int> untrusted_subset, bithash* trusted, double (&ntnt_prob)[4][4], bool learning);
+  bool correct_cc(vector<short>, vector<int> untrusted_subset, bithash* trusted, double (&ntnt_prob)[4][4], bool learning);
   vector<short> error_region(vector<int> untrusted_subset);
-  bool check_trust(corrected_read *cr, bithash *trusted);
+  vector<short> error_region_chop(vector<int> untrusted_subset);
+  bool check_trust(corrected_read *cr, bithash *trusted, unsigned int & check_count);
   string print_seq();
   //string print_corrected(corrected_read* cr);
   string print_corrected(vector<correction> & cor);
@@ -96,7 +97,7 @@ class Read {
   vector<int> untrusted;
   corrected_read *trusted_read;
 
-  const static float trust_spread_t = .1;
+  const static float trust_spread_t = .2;
   const static float correct_min_t = .00001;
   const static float learning_min_t = .005;
   static bool illumina_qual;
