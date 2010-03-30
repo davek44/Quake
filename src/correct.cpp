@@ -38,6 +38,9 @@ static char* zipd = NULL;
 // -C, Contrail output
 static bool contrail_out = false;
 
+// PA_PARAMS WILL FAIL IF THREADS*CPT > NUM_READS
+static unsigned int chunks_per_thread = 1000;
+
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
@@ -207,11 +210,16 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
   reads_in.close();
   N /= 4ULL;
 
+  if(threads*chunks_per_thread > N) {
+    cerr << "Too many threads and chunks!  Rewrite pa_params!" << endl;
+    exit(EXIT_FAILURE);
+  }
+
   // determine counts per thread
   unsigned long long sum = 0;
-  for(int i = 0; i < threads-1; i++) {
-    counts.push_back(N / threads);
-    sum += N/threads;
+  for(int i = 0; i < threads*chunks_per_thread-1; i++) {
+    counts.push_back(N / (threads*chunks_per_thread));
+    sum += counts.back();
   }
   counts.push_back(N - sum);
 
@@ -241,159 +249,172 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
 //
 // Combine output files into one.
 ////////////////////////////////////////////////////////////
-static void combine_output(const char* outf) {
-  char mycmd[100];
+static void combine_output(const char* outf, bool final) {
+  char mycmd[30000];
 
-  // clean file
-  ofstream out_all(outf);
-  out_all.close();
-  
+  // cat thread output
+  strcpy(mycmd, "cat ");  
   char strt[10];
   for(int t = 0; t < threads; t++) {
+    strcat(mycmd, outf);
     sprintf(strt,"%d",t);
-    
-    // cat thread output
-    strcpy(mycmd, "cat ");
-    strcat(mycmd, outf);
     strcat(mycmd, strt);
-    strcat(mycmd, " >> ");
-    strcat(mycmd, outf);
-    system(mycmd);
-    
-    // rm thread output
-    strcpy(mycmd, "rm ");
-    strcat(mycmd, outf);
-    strcat(mycmd, strt);
-    system(mycmd);
+    strcat(mycmd, " ");
   }
+  // into single file
+  strcat(mycmd, "> ");
+  strcat(mycmd, outf);
+    
+  // rm thread output
+  strcat(mycmd, "; rm ");
+  for(int t = 0; t < threads; t++) {
+    strcat(mycmd, outf);
+    sprintf(strt,"%d",t);
+    strcat(mycmd, strt);
+    strcat(mycmd, " ");
+  }
+
+  if(!final)
+    // run in background
+    strcat(mycmd, "&");
+
+  // execute
+  cout << mycmd << endl;
+  system(mycmd);
 }
 
 ////////////////////////////////////////////////////////////
 // correct_reads
 ////////////////////////////////////////////////////////////
-static void correct_reads(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4]) {
+static void correct_reads(string fqf, bool final, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4]) {
   // format output file
   int suffix_index = fqf.rfind(".");
   string prefix = fqf.substr(0,suffix_index);
   string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
   string outf = prefix + string(".cor") + suffix;
   //cout << outf << endl;
-  
+
+  unsigned int chunk = 0;
 #pragma omp parallel //shared(trusted)
   {
     int tid = omp_get_thread_num();
     
+    // output
     string toutf(outf);
     stringstream tconvert;
     tconvert << tid;
     toutf += tconvert.str();
     ofstream reads_out(toutf.c_str());
 
-    /*
-    char* toutf = strdup(outf.c_str());
-    char strtid[10];
-    sprintf(strtid,"%d",tid);
-    strcat(toutf, strtid);
-    cout << toutf << endl;
-    ofstream reads_out(toutf);
-    */
-
+    // input
     ifstream reads_in(fqf.c_str());
-    reads_in.seekg(starts[tid]);
     
+    unsigned int tchunk;
     string header,ntseq,mid,strqual,corseq;
     char* nti;
     Read *r;
 
-    unsigned long long tcount = 0;
-    while(getline(reads_in, header)) {
-      //cout << tid << " " << header << endl;
+    while(chunk < threads*chunks_per_thread) {
+      #pragma omp critical
+      tchunk = chunk++;
 
-      // get sequence
-      getline(reads_in, ntseq);
-      //cout << ntseq << endl;
+      reads_in.seekg(starts[tchunk]);
 
-      // convert ntseq to iseq
-      vector<unsigned int> iseq;
-      for(int i = 0; i < ntseq.size(); i++) {
-	nti = strchr(nts, ntseq[i]);	
-	iseq.push_back(nti - nts);
-      }
-      
-      vector<int> untrusted;
-      for(int i = 0; i < iseq.size()-k+1; i++) {
-	if(!trusted->check(&iseq[i])) {
-	  untrusted.push_back(i);
+      unsigned long long tcount = 0;
+      while(getline(reads_in, header)) {
+	//cout << tid << " " << header << endl;
+	
+	// get sequence
+	getline(reads_in, ntseq);
+	//cout << ntseq << endl;
+	
+	// convert ntseq to iseq
+	vector<unsigned int> iseq;
+	for(int i = 0; i < ntseq.size(); i++) {
+	  nti = strchr(nts, ntseq[i]);	
+	  iseq.push_back(nti - nts);
 	}
-      }
-    
-      // get quality values
-      getline(reads_in,mid);
-      //cout << mid << endl;
-      getline(reads_in,strqual);
-      //cout << strqual << endl;
-      
-      // fix error reads
-      if(untrusted.size() > 0) {
-	r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
-
-	// try to trim
-	corseq = r->trim(trimq);	
-
-	if(r->untrusted.empty()) {
-	  // long enough?
-	  if(corseq.size() >= trim_t) {
-	    if(contrail_out)
-	      reads_out << header << "\t" << corseq << endl;
-	    else
-	      reads_out << header << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
-
-	    if(TESTING)
-	      cerr << header << "\t" << ntseq << "\t" << corseq << endl;
+	
+	vector<int> untrusted;
+	for(int i = 0; i < iseq.size()-k+1; i++) {
+	  if(!trusted->check(&iseq[i])) {
+	    untrusted.push_back(i);
+	  }
+	}
+	
+	// get quality values
+	getline(reads_in,mid);
+	//cout << mid << endl;
+	getline(reads_in,strqual);
+	//cout << strqual << endl;
+	
+	// fix error reads
+	if(untrusted.size() > 0) {
+	  r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
 	  
-	  // else throw away
+	  // try to trim
+	  corseq = r->trim(trimq);	
+	  
+	  if(r->untrusted.empty()) {
+	    // long enough?
+	    if(corseq.size() >= trim_t) {
+	      if(contrail_out)
+		reads_out << header << "\t" << corseq << endl;
+	      else
+		reads_out << header << " trim=" << (ntseq.size()-corseq.size()) << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
+	      
+	      if(TESTING)
+		cerr << header << "\t" << ntseq << "\t" << corseq << endl;
+	      
+	      // else throw away
+	    } else {
+	      if(TESTING)
+		cerr << header << "\t" << ntseq << "\t." << endl;
+	    }
+	    
 	  } else {
-	    if(TESTING)
-	      cerr << header << "\t" << ntseq << "\t." << endl;
+	    // if still untrusted, correct
+	    corseq = r->correct(trusted, ntnt_prob);
+	    
+	    // if trimmed to long enough
+	    if(corseq.size() >= trim_t) {
+	      if(contrail_out)
+		reads_out << header << "\t" << corseq << endl;
+	      else {
+		unsigned int trimlen = ntseq.size()-corseq.size();
+		if(trimlen > 0)
+		  reads_out << header << "correct trim=" << trimlen << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
+		else
+		  reads_out << header << "correct" << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
+	      }
+	      
+	      if(TESTING)
+		cerr << header << "\t" << ntseq << "\t" << corseq << endl;
+	      
+	      // else throw away
+	    } else {
+	      if(TESTING)
+		cerr << header << "\t" << ntseq << "\t-" << endl;
+	    }
 	  }
-
+	  
+	  delete r;
 	} else {
-	  // if still untrusted, correct
-	  corseq = r->correct(trusted, ntnt_prob);
-
-	  // if trimmed to long enough
-	  if(corseq.size() >= trim_t) {
-	    if(contrail_out)
-	      reads_out << header << "\t" << corseq << endl;
-	    else
-	      reads_out << header << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
-
-	    if(TESTING)
-	      cerr << header << "\t" << ntseq << "\t" << corseq << endl;
-
-	  // else throw away
-	  } else {
-	    if(TESTING)
-	      cerr << header << "\t" << ntseq << "\t-" << endl;
-	  }
+	  // output read as is
+	  if(contrail_out)
+	    reads_out << header << "\t" << ntseq << endl;
+	  else
+	    reads_out << header << endl << ntseq << endl << mid << endl << strqual << endl;
 	}
-
-	delete r;
-      } else {
-	// output read as is
-	if(contrail_out)
-	  reads_out << header << "\t" << ntseq << endl;
-	else
-	  reads_out << header << endl << ntseq << endl << mid << endl << strqual << endl;
+	
+	if(++tcount == counts[tchunk])
+	  break;
       }
-
-      if(++tcount == counts[tid])
-	break;
     }
     reads_in.close();
   }
   
-  //combine_output(outf.c_str());
+  combine_output(outf.c_str(), final);
 }
 
 ////////////////////////////////////////////////////////////
@@ -407,84 +428,88 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
   int ntnt_counts[4][4] = {0};
   unsigned int samples = 0;
 
+  unsigned int chunk = 0;
 #pragma omp parallel //shared(trusted)
-  {
-    int tid = omp_get_thread_num();
-
-    ifstream reads_in(fqf.c_str());
-    reads_in.seekg(starts[tid]);
-    
+  {    
+    unsigned int tchunk;
     string header,ntseq,strqual,corseq;
     char* nti;
     Read *r;    
-    //correction* cor;
-
-    unsigned long long tcount = 0;
-    while(getline(reads_in, header)) {
-      //cout << header << endl;
-
-      // get sequence
-      getline(reads_in, ntseq);
-      //cout << ntseq << endl;
-
-      // convert ntseq to iseq
-      vector<unsigned int> iseq;
-      for(int i = 0; i < ntseq.size(); i++) {
-	nti = strchr(nts, ntseq[i]);
-	iseq.push_back(nti - nts);
-      }
-      
-      vector<int> untrusted;
-      for(int i = 0; i < iseq.size()-k+1; i++) {
-	if(!trusted->check(&iseq[i])) {
-	  untrusted.push_back(i);
-	}
-      }
+    ifstream reads_in(fqf.c_str());
     
-      // get quality values
-      getline(reads_in,strqual);
-      //cout << strqual << endl;
-      getline(reads_in,strqual);
-      //cout << strqual << endl;
+    while(chunk < threads*chunks_per_thread) {
+#pragma omp critical
+      tchunk = chunk++;     
       
-      // fix error reads
-      if(untrusted.size() > 0) {
-	//cout << "Processing " << header;
-	//for(int i = 0; i < untrusted.size(); i++) {
-	//  cout << " " << untrusted[i];	  
-	//}
-	//cout << endl;
-
-	r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
-
-	// try to trim
-	corseq = r->trim(trimq);
-	if(!r->untrusted.empty()) {
-	  // if still untrusted, correct
-	  corseq = r->correct(trusted, ntnt_prob, true);
-
-	  // if trimmed to long enough
-	  if(corseq.size() >= trim_t) {
-	    if(r->trusted_read != 0) { // else no guarantee there was a correction
-	      for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
-		correction cor = r->trusted_read->corrections[c];
-		if(iseq[cor.index] < 4) {
-		  // real -> observed, (real approximated by correction)
-		  //ntnt_counts[cor.to][iseq[cor.index]]++;
-		  
-		  // hmm well its best to compute P(real|observed)
-		  ntnt_counts[iseq[cor.index]][cor.to]++;
-		  samples++;
+      reads_in.seekg(starts[tchunk]);
+      
+      unsigned long long tcount = 0;
+      while(getline(reads_in, header)) {
+	//cout << header << endl;
+	
+	// get sequence
+	getline(reads_in, ntseq);
+	//cout << ntseq << endl;
+	
+	// convert ntseq to iseq
+	vector<unsigned int> iseq;
+	for(int i = 0; i < ntseq.size(); i++) {
+	  nti = strchr(nts, ntseq[i]);
+	  iseq.push_back(nti - nts);
+	}
+	
+	vector<int> untrusted;
+	for(int i = 0; i < iseq.size()-k+1; i++) {
+	  if(!trusted->check(&iseq[i])) {
+	    untrusted.push_back(i);
+	  }
+	}
+	
+	// get quality values
+	getline(reads_in,strqual);
+	//cout << strqual << endl;
+	getline(reads_in,strqual);
+	//cout << strqual << endl;
+	
+	// fix error reads
+	if(untrusted.size() > 0) {
+	  //cout << "Processing " << header;
+	  //for(int i = 0; i < untrusted.size(); i++) {
+	  //  cout << " " << untrusted[i];	  
+	  //}
+	  //cout << endl;
+	  
+	  r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
+	  
+	  // try to trim
+	  corseq = r->trim(trimq);
+	  if(!r->untrusted.empty()) {
+	    // if still untrusted, correct
+	    corseq = r->correct(trusted, ntnt_prob, true);
+	    
+	    // if trimmed to long enough
+	    if(corseq.size() >= trim_t) {
+	      if(r->trusted_read != 0) { // else no guarantee there was a correction
+		for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
+		  correction cor = r->trusted_read->corrections[c];
+		  if(iseq[cor.index] < 4) {
+		    // real -> observed, (real approximated by correction)
+		    //ntnt_counts[cor.to][iseq[cor.index]]++;
+		    
+		    // hmm well its best to compute P(real|observed)
+		    ntnt_counts[iseq[cor.index]][cor.to]++;
+		    samples++;
+		  }
 		}
 	      }
 	    }
 	  }
+	  delete r;
 	}
-	delete r;
+	
+	if(++tcount == counts[tchunk] || samples > 100000)
+	  break;
       }
-
-      if(++tcount == counts[tid] || samples > 50000)
-	break;
     }
     reads_in.close();
   }
@@ -697,7 +722,7 @@ int main(int argc, char **argv) {
 	  ntnt_prob[i][j] = 1.0/3.0;
       }
     }
-    //learn_errors(fqf, trusted, starts, counts, ntnt_prob);
+    learn_errors(fqf, trusted, starts, counts, ntnt_prob);
 
     cout << "New error matrix:" << endl;
     cout << "\tA\tC\tG\tT" << endl;
@@ -712,7 +737,7 @@ int main(int argc, char **argv) {
       cout << endl;
     }
 
-    correct_reads(fqf, trusted, starts, counts, ntnt_prob);
+    correct_reads(fqf, (f == fastqfs.size()-1), trusted, starts, counts, ntnt_prob);
 
     if(zipd != NULL)
       zip_fastq(fqf.c_str());
