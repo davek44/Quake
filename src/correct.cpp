@@ -39,12 +39,12 @@ static char* zipd = NULL;
 static bool contrail_out = false;
 
 // PA_PARAMS WILL FAIL IF THREADS*CPT > NUM_READS
-static unsigned int chunks_per_thread = 1000;
+static unsigned int chunks_per_thread = 500;
 
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
-#define TESTING false
+#define TESTING true
 static const char* nts = "ACGTN";
 
 static void  Usage
@@ -211,7 +211,7 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
   N /= 4ULL;
 
   if(threads*chunks_per_thread > N) {
-    cerr << "Too many threads and chunks!  Rewrite pa_params!" << endl;
+    cerr << N << " reads- too many threads and chunks!  Rewrite pa_params!" << endl;
     exit(EXIT_FAILURE);
   }
 
@@ -286,7 +286,7 @@ static void combine_output(const char* outf, bool final) {
 ////////////////////////////////////////////////////////////
 // correct_reads
 ////////////////////////////////////////////////////////////
-static void correct_reads(string fqf, bool final, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4]) {
+static void correct_reads(string fqf, bool final, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
   // format output file
   int suffix_index = fqf.rfind(".");
   string prefix = fqf.substr(0,suffix_index);
@@ -374,7 +374,7 @@ static void correct_reads(string fqf, bool final, bithash * trusted, vector<stre
 	    
 	  } else {
 	    // if still untrusted, correct
-	    corseq = r->correct(trusted, ntnt_prob);
+	    corseq = r->correct(trusted, ntnt_prob, prior_prob);
 	    
 	    // if trimmed to long enough
 	    if(corseq.size() >= trim_t) {
@@ -382,10 +382,17 @@ static void correct_reads(string fqf, bool final, bithash * trusted, vector<stre
 		reads_out << header << "\t" << corseq << endl;
 	      else {
 		unsigned int trimlen = ntseq.size()-corseq.size();
-		if(trimlen > 0)
-		  reads_out << header << "correct trim=" << trimlen << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
-		else
-		  reads_out << header << "correct" << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
+		if(trimlen > 0) {
+		  // trimmed
+		  if(corseq == ntseq.substr(0,corseq.size()))
+		    // w/o changes
+		    reads_out << header << " trim=" << trimlen << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
+		  else
+		    // w/ changes
+		    reads_out << header << " correct trim=" << trimlen << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
+		} else
+		  // not trimmed
+		  reads_out << header << " correct" << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
 	      }
 	      
 	      if(TESTING)
@@ -424,8 +431,8 @@ static void correct_reads(string fqf, bool final, bithash * trusted, vector<stre
 // to count the nt->nt errors and learn the errors
 // probabilities
 ////////////////////////////////////////////////////////////
-static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4]) {
-  int ntnt_counts[4][4] = {0};
+static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
+  unsigned int ntnt_counts[4][4] = {0};
   unsigned int samples = 0;
 
   unsigned int chunk = 0;
@@ -485,7 +492,7 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 	  corseq = r->trim(trimq);
 	  if(!r->untrusted.empty()) {
 	    // if still untrusted, correct
-	    corseq = r->correct(trusted, ntnt_prob, true);
+	    corseq = r->correct(trusted, ntnt_prob, prior_prob, true);
 	    
 	    // if trimmed to long enough
 	    if(corseq.size() >= trim_t) {
@@ -493,11 +500,11 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 		for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
 		  correction cor = r->trusted_read->corrections[c];
 		  if(iseq[cor.index] < 4) {
-		    // real -> observed, (real approximated by correction)
-		    //ntnt_counts[cor.to][iseq[cor.index]]++;
+		    // P(obs=o|actual=a,a!=o) for Bayes
+		    ntnt_counts[cor.to][iseq[cor.index]]++;
 		    
-		    // hmm well its best to compute P(real|observed)
-		    ntnt_counts[iseq[cor.index]][cor.to]++;
+		    // P(actual=a|obs=o,a!=o)
+		    //ntnt_counts[iseq[cor.index]][cor.to]++;
 		    samples++;
 		  }
 		}
@@ -529,7 +536,7 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
   cout << endl;
 
   // make counts into probabilities
-  int ntsum;
+  unsigned int ntsum;
   for(int i = 0; i < 4; i++) {
     // sum all corrections from this nt
     ntsum = 0;
@@ -579,6 +586,17 @@ vector<double> load_AT_cutoffs() {
 void unzip_fastq(const char* fqf) {
   char mycmd[100];
 
+  // zcat to cwd
+  strcpy(mycmd, "zcat ");
+  strcat(mycmd, zipd);
+  strcat(mycmd, "/");
+  strcat(mycmd, fqf);
+  strcat(mycmd, " > ");
+  strncat(mycmd, fqf, strstr(fqf, ".gz") - fqf);
+  cout << mycmd << endl;
+  system(mycmd);
+
+  /*
   // cp to cwd
   strcpy(mycmd, "cp ");
   strcat(mycmd, zipd);
@@ -591,6 +609,7 @@ void unzip_fastq(const char* fqf) {
   strcpy(mycmd, "gunzip ");
   strcat(mycmd, fqf);
   system(mycmd);
+  */
 }
 
 ////////////////////////////////////////////////////////////
@@ -607,6 +626,7 @@ void zip_fastq(const char* fqf) {
   strcat(mycmd, fqf);
   system(mycmd);
 
+  /*  Doesn't work with combining output in background.
   // determine output file
   string fqf_str(fqf);
   int suffix_index = fqf_str.rfind(".");
@@ -625,6 +645,7 @@ void zip_fastq(const char* fqf) {
   strcat(mycmd, ".gz ");
   strcat(mycmd, zipd);
   system(mycmd);
+  */
 }
 
 ////////////////////////////////////////////////////////////
@@ -658,6 +679,9 @@ int main(int argc, char **argv) {
   // set up parallelism
   omp_set_num_threads(threads);
 
+  // count AT's and GC's
+  unsigned long long atgc[2] = {0};
+
   // make trusted kmer data structure
   bithash *trusted = new bithash();
   if(is_kmer_file(merf)) {
@@ -668,24 +692,33 @@ int main(int argc, char **argv) {
 
     if(ATcutf != NULL) {
       if(strcmp(merf,"-") == 0)
-	trusted->tab_file_load(cin, load_AT_cutoffs());
+	trusted->tab_file_load(cin, load_AT_cutoffs(), atgc);
       else {
 	ifstream mer_in(merf);
-	trusted->tab_file_load(mer_in, load_AT_cutoffs());
+	trusted->tab_file_load(mer_in, load_AT_cutoffs(), atgc);
       }
     } else {
       if(strcmp(merf,"-") == 0) {
-	trusted->tab_file_load(cin, cutoff);
+	trusted->tab_file_load(cin, cutoff, atgc);
       } else {
 	ifstream mer_in(merf);
-	trusted->tab_file_load(mer_in, cutoff);
+	trusted->tab_file_load(mer_in, cutoff, atgc);
       }
     }
   } else {
     // from from file
-    trusted->binary_file_input_lowmem(merf);
+    trusted->binary_file_input(merf, atgc);
     cout << trusted->num_kmers() << " trusted kmers" << endl;
   }
+
+  double prior_prob[4];
+  prior_prob[0] = (double)atgc[0] / (double)(atgc[0]+atgc[1]) / 2.0;
+  prior_prob[1] = .5 - prior_prob[0];
+  prior_prob[2] = prior_prob[1];
+  prior_prob[3] = prior_prob[0];
+  
+  cout << "AT: " << atgc[0] << " GC: " << atgc[1] << endl;
+  cout << "AT% = " << (2*prior_prob[0]) << endl;
 
   // make list of files
   vector<string> fastqfs;
@@ -722,7 +755,7 @@ int main(int argc, char **argv) {
 	  ntnt_prob[i][j] = 1.0/3.0;
       }
     }
-    learn_errors(fqf, trusted, starts, counts, ntnt_prob);
+    learn_errors(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
 
     cout << "New error matrix:" << endl;
     cout << "\tA\tC\tG\tT" << endl;
@@ -737,7 +770,7 @@ int main(int argc, char **argv) {
       cout << endl;
     }
 
-    correct_reads(fqf, (f == fastqfs.size()-1), trusted, starts, counts, ntnt_prob);
+    correct_reads(fqf, (f == fastqfs.size()-1), trusted, starts, counts, ntnt_prob, prior_prob);
 
     if(zipd != NULL)
       zip_fastq(fqf.c_str());

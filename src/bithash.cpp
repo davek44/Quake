@@ -125,7 +125,7 @@ void bithash::meryl_file_load(const char* merf, const double boundary) {
 // Make a prefix_tree from kmers in the file given that
 // occur >= "boundary" times
 ////////////////////////////////////////////////////////////
-void bithash::tab_file_load(istream & mer_in, const double boundary) {
+void bithash::tab_file_load(istream & mer_in, const double boundary, unsigned long long atgc[]) {
   string line;
   double count;
 
@@ -146,6 +146,13 @@ void bithash::tab_file_load(istream & mer_in, const double boundary) {
 
       // add reverse to tree
       add(binary_rckmer(line.substr(0,k)));
+
+      // count gc
+      if(atgc != NULL) {
+	unsigned int at = count_at(line.substr(0,k));
+	atgc[0] += at;
+	atgc[1] += (k-at);
+      }
     }
   }
 }
@@ -156,7 +163,7 @@ void bithash::tab_file_load(istream & mer_in, const double boundary) {
 // Make a prefix_tree from kmers in the file given that
 // occur >= "boundary" times
 ////////////////////////////////////////////////////////////
-void bithash::tab_file_load(istream & mer_in, const vector<double> boundary) {
+void bithash::tab_file_load(istream & mer_in, const vector<double> boundary, unsigned long long atgc[]) {
   string line;
   double count;
   int at;
@@ -180,6 +187,13 @@ void bithash::tab_file_load(istream & mer_in, const vector<double> boundary) {
 
       // add reverse to tree
       add(binary_rckmer(line.substr(0,k)));
+
+      // count gc
+      if(atgc != NULL) {
+	unsigned int at = count_at(line.substr(0,k));
+	atgc[0] += at;
+	atgc[1] += (k-at);
+      }
     }
   }
 }
@@ -214,6 +228,7 @@ void bithash::binary_file_output(char* outf) {
 //
 // Read bithash from file in binary format
 ////////////////////////////////////////////////////////////
+/*
 void bithash::binary_file_input(char* inf) {
   ifstream ifs(inf, ios::binary);
 
@@ -242,13 +257,14 @@ void bithash::binary_file_input(char* inf) {
 
   delete[] buffer;
 }
+*/
 
 ////////////////////////////////////////////////////////////
 // binary_file_input
 //
 // Read bithash from file in binary format
 ////////////////////////////////////////////////////////////
-void bithash::binary_file_input_lowmem(char* inf) {
+void bithash::binary_file_input(char* inf, unsigned long long atgc[]) {
   unsigned int flag = 128;
   unsigned int temp;
 
@@ -271,8 +287,14 @@ void bithash::binary_file_input_lowmem(char* inf) {
     for(unsigned long long i = 0; i < buffersize; i++) {
       temp = (unsigned int)buffer[i];
       for(int j = 0; j < 8; j++) {
-	if((temp & flag) == flag)
+	if((temp & flag) == flag) {
 	  bits.set((buffersize*b + i)*8 + j);
+	  
+	  // count gc
+	  unsigned int at = count_at((buffersize*b + i)*8 + j);
+	  atgc[0] += at;
+	  atgc[1] += (k-at);
+	}
 	temp <<= 1;
       }
     }
@@ -291,6 +313,20 @@ int bithash::count_at(string seq) {
   for(int i = 0; i < seq.size(); i++)
     if(seq[i] == 'A' || seq[i] == 'T')
       at +=  1;
+  return at;
+}
+
+int bithash::count_at(unsigned long long seq) {
+  int at = 0;
+  unsigned long long mask = 3;
+  unsigned long long nt;
+  for(int i = 0; i < k; i++) {
+    nt = seq & mask;
+    seq >>= 2;
+
+    if(nt == 0 || nt == 3)
+      at++;
+  }
   return at;
 }
 

@@ -4,10 +4,10 @@ CPPUNIT_PATH = /fs/sz-user-supported/Linux-x86_64
 
 .PHONY: all clean
 
-all: correct trim build_bithash
+all: correct trim build_bithash correct_stats
 
 clean:
-	-rm correct trim test *.o
+	-rm correct trim correct_stats build_bithash test *.o
 
 correct: correct.cpp Read.o bithash.o
 	$(CC) $(CFLAGS) correct.cpp Read.o bithash.o -o correct
@@ -17,6 +17,9 @@ trim: trim.cpp Read.o bithash.o
 
 build_bithash: build_bithash.cpp bithash.o
 	$(CC) $(CFLAGS) build_bithash.cpp bithash.o -o build_bithash
+
+correct_stats: stats.cpp
+	$(CC) $(CFLAGS) stats.cpp -o correct_stats
 
 Read.o: Read.cpp Read.h bithash.o
 	$(CC) $(CFLAGS) -c Read.cpp

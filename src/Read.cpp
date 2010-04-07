@@ -6,7 +6,7 @@
 #include <set>
 #include <queue>
 
-#define TESTING false
+#define TESTING true
 
 ////////////////////////////////////////////////////////////
 // corrections_compare
@@ -123,7 +123,7 @@ bool Read::single_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[
 //
 // Corrections can be accessed through 'trusted_read'
 ////////////////////////////////////////////////////////////
-bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double (&ntnt_prob)[4][4], bool learning) {  
+bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning) {  
   /*  
   if(header == "@16") {
     cout << "Untrusted: " << untrusted_subset.size() << endl;
@@ -169,12 +169,16 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
   // filter
   ////////////////////////////////////////
   double mylike_t = correct_min_t;
+  double myglobal_t = correct_min_t;
+  double myspread_t = trust_spread_t;
   if(learning) {
     if(nt99 >= 8) {
       //out << header << "\t" << print_seq() << "\t." << endl;
       return false;
     }
-
+    mylike_t = learning_min_t;
+    myglobal_t = learning_min_t;
+    myspread_t = trust_spread_t / 2.0;
   } else if(nt99 >= 13) {
     // just quit
     if(TESTING)
@@ -216,8 +220,11 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
 
     for(short nt = 0; nt < 4; nt++) {
       if(seq[edit_i] != nt) {
-	//like = (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
-	like = (1.0-prob[edit_i]) * ntnt_prob[seq[edit_i]][nt] / prob[edit_i];
+	// P(obs=o|actual=a)*P(actual=a) for Bayes
+	like = (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] * prior_prob[nt] / (prob[edit_i] * prior_prob[seq[edit_i]]);
+
+	// P(actual=a|obs=o)
+	//like = (1.0-prob[edit_i]) * ntnt_prob[seq[edit_i]][nt] * / prob[edit_i];
 	
 	next_cr = new corrected_read(bituntrusted, like, region_edit+1);
 	next_cr->corrections.push_back(correction(edit_i, nt));
@@ -269,13 +276,13 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
     /////////////////////////
     if(trusted_read != 0) {
       // if a corrected read exists, compare likelihoods and if likelihood is too low, break loop return true
-      if(cr->likelihood < trusted_likelihood*trust_spread_t) {
+      if(cr->likelihood < trusted_likelihood*myspread_t) {
 	delete cr;
 	break;
       }
     } else {
       // if no corrected read exists and likelihood is too low, break loop return false
-      if(cr->likelihood < mylike_t || global_like*cr->likelihood < correct_min_t) {
+      if(cr->likelihood < mylike_t || global_like*cr->likelihood < myglobal_t) {
 	delete cr;
 	break;
       }
@@ -337,17 +344,20 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
 	  // if actual edit, 
 	  if(seq[edit_i] != nt) {
 	    // calculate new likelihood
-	    // error is real->observed, (with real approximated by correction)
-	    //like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] / prob[edit_i];
-	    like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[seq[edit_i]][nt] / prob[edit_i];
+
+	    // P(obs=o|actual=a)*P(actual=a) for Bayes
+	    like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] * prior_prob[nt] / (prob[edit_i] * prior_prob[seq[edit_i]]);
+
+	    // P(actual=a|obs=o)	    
+	    //like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[seq[edit_i]][nt] / prob[edit_i];	
 	    
 	    // if thresholds ok, add new correction
 	    if(trusted_read != 0) {
-	      if(like < trusted_likelihood*trust_spread_t)
+	      if(like < trusted_likelihood*myspread_t)
 		continue;
 	    } else {
 	      // must consider spread or risk missing a case of ambiguity
-	      if(like < mylike_t*trust_spread_t || global_like*like < correct_min_t*trust_spread_t)
+	      if(like < mylike_t*myspread_t || global_like*like < myglobal_t*myspread_t)
 		continue;
 	    }
 	    
@@ -430,7 +440,7 @@ string Read::print_corrected(vector<correction> & cor, int print_nt) {
 // into connected components and correcting them
 // independently.
 ////////////////////////////////////////////////////////////
-string Read::correct(bithash *trusted, double (&ntnt_prob)[4][4], bool learning) {
+string Read::correct(bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning) {
   ////////////////////////////////////////
   // find connected components
   ////////////////////////////////////////
@@ -458,11 +468,11 @@ string Read::correct(bithash *trusted, double (&ntnt_prob)[4][4], bool learning)
   for(cc = 0; cc < cc_untrusted.size(); cc++) {
     // try chopped error region
     region = error_region_chop(cc_untrusted[cc]);
-    if(!correct_cc(region, cc_untrusted[cc], trusted, ntnt_prob, learning)) {
+    if(!correct_cc(region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {
 
       // try bigger error region
       region = error_region(cc_untrusted[cc]);
-      if(!correct_cc(region, cc_untrusted[cc], trusted, ntnt_prob, learning)) {
+      if(!correct_cc(region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {
 	
 	// cannot correct, but trim
 	// Note: In some cases, we'll overtrim here, but given that we couldn't
