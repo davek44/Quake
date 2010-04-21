@@ -77,9 +77,11 @@ class Read {
 
   string trim(int t);
   //bool trim(int t, ofstream & out);
-  string correct(bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning = false);
+  //string correct(bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning = false);
+  string correct(bithash *trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning = false);
   //bool single_correct(bithash* trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning = false);
-  bool correct_cc(vector<short>, vector<int> untrusted_subset, bithash* trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning);
+  //bool correct_cc(vector<short>, vector<int> untrusted_subset, bithash* trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning);
+  bool correct_cc(vector<short>, vector<int> untrusted_subset, bithash* trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning);
   vector<short> error_region(vector<int> untrusted_subset);
   vector<short> error_region_chop(vector<int> untrusted_subset);
   bool check_trust(corrected_read *cr, bithash *trusted, unsigned int & check_count);
@@ -93,13 +95,14 @@ class Read {
   int read_length;
   int trim_length;
   unsigned int* seq;
+  unsigned int* quals;
   float* prob;
   vector<int> untrusted;
   corrected_read *trusted_read;
 
   const static float trust_spread_t = .2;
-  const static float correct_min_t = .00001;
-  const static float learning_min_t = .0001;
+  const static float correct_min_t = .000001;
+  const static float learning_min_t = .00001;
   static bool illumina_qual;
 
  private:

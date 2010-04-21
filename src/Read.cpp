@@ -6,7 +6,7 @@
 #include <set>
 #include <queue>
 
-#define TESTING true
+#define TESTING false
 
 ////////////////////////////////////////////////////////////
 // corrections_compare
@@ -41,14 +41,18 @@ Read::Read(const string & h, const unsigned int* s, const string & q, vector<int
   read_length = rl;
   trim_length = rl;
   seq = new unsigned int[read_length];
+  quals = new unsigned int[read_length];
   prob = new float[read_length];
   for(int i = 0; i < read_length; i++) {
-    seq[i] = s[i];    
+    seq[i] = s[i];
     // quality values of 0,1 lead to p < .25
-    if(illumina_qual)
+    if(illumina_qual) {
+      quals[i] = q[i] - 64;
       prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-64)/10.0));
-    else
+    } else {
+      quals[i] = q[i] - 33;
       prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-33)/10.0));
+    }
   }
   trusted_read = 0;
   global_like = 1.0;
@@ -56,6 +60,7 @@ Read::Read(const string & h, const unsigned int* s, const string & q, vector<int
 
 Read::~Read() {
   delete[] seq;
+  delete[] quals;
   delete[] prob;
   if(trusted_read != 0)
     delete trusted_read;
@@ -123,9 +128,11 @@ bool Read::single_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[
 //
 // Corrections can be accessed through 'trusted_read'
 ////////////////////////////////////////////////////////////
-bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning) {  
-  /*  
-  if(header == "@16") {
+//bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning) {  
+bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning) {  
+
+  /*
+  if(header == "@4844") {
     cout << "Untrusted: " << untrusted_subset.size() << endl;
     for(int i = 0; i < untrusted_subset.size(); i++)
       cout << untrusted_subset[i] << " ";
@@ -157,12 +164,15 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
   float exp_errors = 0;
   int nt90 = 0;
   int nt99 = 0;
+  int non_acgt = 0;
   for(int i = 0; i < region.size(); i++) {
     exp_errors += (1-prob[region[i]]);
     if(prob[region[i]] < .9)
       nt90++;
     if(prob[region[i]] < .99)
       nt99++;
+    if(seq[region[i]] >= 4)
+      non_acgt++;
   }  
 
   ////////////////////////////////////////
@@ -172,14 +182,14 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
   double myglobal_t = correct_min_t;
   double myspread_t = trust_spread_t;
   if(learning) {
-    if(nt99 >= 8) {
+    if(nt99 >= 8 || non_acgt > 1) {
       //out << header << "\t" << print_seq() << "\t." << endl;
       return false;
     }
     mylike_t = learning_min_t;
     myglobal_t = learning_min_t;
     myspread_t = trust_spread_t / 2.0;
-  } else if(nt99 >= 13) {
+  } else if(nt99 >= 13 || non_acgt > 2) {
     // just quit
     if(TESTING)
 	cerr << header << "\t" << print_seq() << "\t." << endl;
@@ -221,7 +231,11 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
     for(short nt = 0; nt < 4; nt++) {
       if(seq[edit_i] != nt) {
 	// P(obs=o|actual=a)*P(actual=a) for Bayes
-	like = (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] * prior_prob[nt] / (prob[edit_i] * prior_prob[seq[edit_i]]);
+	if(seq[edit_i] < 4)
+	  like = (1.0-prob[edit_i]) * ntnt_prob[quals[edit_i]][nt][seq[edit_i]] * prior_prob[nt] / (prob[edit_i] * prior_prob[seq[edit_i]]);
+	else
+	  // non-ACGT
+	  like = prior_prob[nt] / (1.0/3.0);
 
 	// P(actual=a|obs=o)
 	//like = (1.0-prob[edit_i]) * ntnt_prob[seq[edit_i]][nt] * / prob[edit_i];
@@ -311,8 +325,8 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
       }
     }
 
-    /*    
-    if(header == "@16") {
+    /*
+    if(header == "@4844") {
       cout << cr->likelihood << "\t";
       for(int c = 0; c < cr->corrections.size(); c++) {
 	cout << " (" << cr->corrections[c].index << "," << cr->corrections[c].to << ")";
@@ -346,7 +360,11 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
 	    // calculate new likelihood
 
 	    // P(obs=o|actual=a)*P(actual=a) for Bayes
-	    like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[nt][seq[edit_i]] * prior_prob[nt] / (prob[edit_i] * prior_prob[seq[edit_i]]);
+	    if(seq[edit_i] < 4)
+	      like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[quals[edit_i]][nt][seq[edit_i]] * prior_prob[nt] / (prob[edit_i] * prior_prob[seq[edit_i]]);
+	    else
+	      // non-ACGT
+	      like = cr->likelihood * prior_prob[nt] / (1.0/3.0);
 
 	    // P(actual=a|obs=o)	    
 	    //like = cr->likelihood * (1.0-prob[edit_i]) * ntnt_prob[seq[edit_i]][nt] / prob[edit_i];	
@@ -440,7 +458,8 @@ string Read::print_corrected(vector<correction> & cor, int print_nt) {
 // into connected components and correcting them
 // independently.
 ////////////////////////////////////////////////////////////
-string Read::correct(bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning) {
+//string Read::correct(bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning) {
+string Read::correct(bithash *trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning) {
   ////////////////////////////////////////
   // find connected components
   ////////////////////////////////////////
@@ -464,15 +483,16 @@ string Read::correct(bithash *trusted, double (&ntnt_prob)[4][4], double prior_p
   // process connected components
   ////////////////////////////////////////
   vector<correction> multi_cors;
-  vector<short> region;
+  vector<short> chop_region;
+  vector<short> big_region;
   for(cc = 0; cc < cc_untrusted.size(); cc++) {
     // try chopped error region
-    region = error_region_chop(cc_untrusted[cc]);
-    if(!correct_cc(region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {
+    chop_region = error_region_chop(cc_untrusted[cc]);
+    if(!correct_cc(chop_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {
 
       // try bigger error region
-      region = error_region(cc_untrusted[cc]);
-      if(!correct_cc(region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {
+      big_region = error_region(cc_untrusted[cc]);
+      if(chop_region.size() == big_region.size() || !correct_cc(big_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {
 	
 	// cannot correct, but trim
 	// Note: In some cases, we'll overtrim here, but given that we couldn't
@@ -687,7 +707,8 @@ bool Read::check_trust(corrected_read *cr, bithash *trusted, unsigned int & chec
 
   int edit = cr->corrections.back().index;
   int kmer_start = max(0, edit-k+1);
-  int kmer_end = min(edit, read_length-k);
+  //int kmer_end = min(edit, read_length-k);
+  int kmer_end = min(edit, trim_length-k);
 
   check_count += (kmer_end - kmer_start + 1);
 

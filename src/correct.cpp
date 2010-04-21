@@ -39,13 +39,14 @@ static char* zipd = NULL;
 static bool contrail_out = false;
 
 // PA_PARAMS WILL FAIL IF THREADS*CPT > NUM_READS
-static unsigned int chunks_per_thread = 500;
+static unsigned int chunks_per_thread = 200;
 
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
-#define TESTING true
+#define TESTING false
 static const char* nts = "ACGTN";
+static const unsigned int max_qual = 50;
 
 static void  Usage
     (char * command)
@@ -250,6 +251,24 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
 // Combine output files into one.
 ////////////////////////////////////////////////////////////
 static void combine_output(const char* outf, bool final) {
+  ofstream combine_out(outf);
+  char strt[10];
+  char toutf[50];
+  string line;
+  for(int t = 0; t < threads; t++) {
+    strcpy(toutf, outf);
+    sprintf(strt,"%d",t);
+    strcat(toutf, strt);
+
+    ifstream thread_out(toutf);
+    while(getline(thread_out, line))
+      combine_out << line << endl;
+    thread_out.close();
+
+    remove(toutf);
+  }
+
+  /*
   char mycmd[30000];
 
   // cat thread output
@@ -281,12 +300,104 @@ static void combine_output(const char* outf, bool final) {
   // execute
   cout << mycmd << endl;
   system(mycmd);
+  */
+}
+
+
+////////////////////////////////////////////////////////////
+// regress_probs
+//
+// Use ntnt_counts to perform nonparametric regression
+// on ntnt_prob across quality values.
+////////////////////////////////////////////////////////////
+void regress_probs(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max_qual][4][4]) {
+  double sigma = 3.0;
+  double sigma2 = pow(sigma, 2);
+  
+  // count # occurrences for each (quality=q,actual=a) tuple
+  unsigned int actual_counts[max_qual][4] = {0};
+  for(int q = 1; q < max_qual; q++)
+    for(int i = 0; i < 4; i++)
+      for(int j = 0; j < 4; j++)
+	actual_counts[q][i] += ntnt_counts[q][i][j];
+
+  // regress
+  double ntdsum;
+  for(int q = 1; q < max_qual; q++) {
+    for(int i = 0; i < 4; i++) {
+      //ntdsum = 0;
+      for(int j = 0; j < 4; j++) {
+	double pnum = 0;
+	double pden = 0;
+	for(int qr = 1; qr < max_qual; qr++) {
+	  pnum += ntnt_counts[qr][i][j] * exp(-pow((double)(qr - q), 2)/(2*sigma2));
+	  pden += actual_counts[qr][i] * exp(-pow((double)(qr - q), 2)/(2*sigma2));
+	}
+	ntnt_prob[q][i][j] = pnum / pden;
+	//ntdsum += ntnt_prob[q][i][j];
+      }
+
+      // re-normalize to sum to 1
+      //for(int j = 0; j < 4; j++)
+      //ntnt_prob[q][i][j] /= ntdsum;
+    }
+  }
+}
+
+
+////////////////////////////////////////////////////////////
+// output_model
+//
+// Print the error model to the file error_model.txt
+////////////////////////////////////////////////////////////
+void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max_qual][4][4]) {
+  ofstream mod_out("error_model.txt");
+
+  unsigned int ntsum;
+  for(int q = 1; q < max_qual; q++) {
+    mod_out << "Quality = " << q << endl;
+
+    // counts
+    mod_out << "\tA\tC\tG\tT" << endl;
+    for(int i = 0; i < 4; i++) {
+      mod_out << nts[i];
+
+      ntsum = 0;
+      for(int j = 0; j < 4; j++)
+	ntsum += ntnt_counts[q][i][j];
+
+      for(int j = 0; j < 4; j++) {
+	if(i == j)
+	  mod_out << "\t-";
+	else if(ntsum > 0)
+	  mod_out << "\t" << ((double)ntnt_counts[q][i][j] / (double)ntsum) << "(" << ntnt_counts[q][i][j] << ")";
+	else
+	  mod_out << "\t0";
+      }
+      mod_out << endl;
+    }
+
+    // probs
+    mod_out << "\tA\tC\tG\tT" << endl;
+    for(int i = 0; i < 4; i++) {
+      mod_out << nts[i];
+      for(int j = 0; j < 4; j++) {
+	if(i == j)
+	  mod_out << "\t-";
+	else
+	  mod_out << "\t" << ntnt_prob[q][i][j];
+      }
+      mod_out << endl;
+    }
+    mod_out << endl;    
+  }
 }
 
 ////////////////////////////////////////////////////////////
 // correct_reads
 ////////////////////////////////////////////////////////////
-static void correct_reads(string fqf, bool final, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
+//static void correct_reads(string fqf, bool final, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
+static void correct_reads(string fqf, bool final, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
   // format output file
   int suffix_index = fqf.rfind(".");
   string prefix = fqf.substr(0,suffix_index);
@@ -431,8 +542,9 @@ static void correct_reads(string fqf, bool final, bithash * trusted, vector<stre
 // to count the nt->nt errors and learn the errors
 // probabilities
 ////////////////////////////////////////////////////////////
-static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
-  unsigned int ntnt_counts[4][4] = {0};
+//static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
+static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
+  unsigned int ntnt_counts[max_qual][4][4] = {0};
   unsigned int samples = 0;
 
   unsigned int chunk = 0;
@@ -477,6 +589,14 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 	//cout << strqual << endl;
 	getline(reads_in,strqual);
 	//cout << strqual << endl;
+
+	vector<int> iqual;
+	for(int i = 0; i < strqual.size(); i++) {
+	  if(Read::illumina_qual)
+	    iqual.push_back(strqual[i]-64);
+	  else
+	    iqual.push_back(strqual[i]-33);
+	}
 	
 	// fix error reads
 	if(untrusted.size() > 0) {
@@ -501,11 +621,14 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 		  correction cor = r->trusted_read->corrections[c];
 		  if(iseq[cor.index] < 4) {
 		    // P(obs=o|actual=a,a!=o) for Bayes
-		    ntnt_counts[cor.to][iseq[cor.index]]++;
+		    ntnt_counts[iqual[cor.index]][cor.to][iseq[cor.index]]++;
 		    
 		    // P(actual=a|obs=o,a!=o)
 		    //ntnt_counts[iseq[cor.index]][cor.to]++;
 		    samples++;
+
+		    if(samples % 10000 == 0)
+		      cout << samples << endl;
 		  }
 		}
 	      }
@@ -514,41 +637,16 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 	  delete r;
 	}
 	
-	if(++tcount == counts[tchunk] || samples > 100000)
+	if(++tcount == counts[tchunk] || samples > 200000)
 	  break;
       }
     }
     reads_in.close();
   }
 
-  cout << "Count matrix:" << endl;
-  cout << "\tA\tC\tG\tT" << endl;
-  for(int i = 0; i < 4; i++) {
-    cout << nts[i];
-    for(int j = 0; j < 4; j++) {
-      if(i == j)
-	cout << "\t-";
-      else
-	cout << "\t" << ntnt_counts[i][j];
-    }
-    cout << endl;
-  }
-  cout << endl;
+  regress_probs(ntnt_prob, ntnt_counts);
 
-  // make counts into probabilities
-  unsigned int ntsum;
-  for(int i = 0; i < 4; i++) {
-    // sum all corrections from this nt
-    ntsum = 0;
-    for(int j = 0; j < 4; j++) {
-      ntsum += ntnt_counts[i][j];
-    }
-
-    // normalize counts by sum
-    for(int j = 0; j < 4; j++) {
-      ntnt_prob[i][j] = (double)ntnt_counts[i][j] / double(ntsum);
-    }
-  }
+  output_model(ntnt_prob, ntnt_counts);
 }
 
 
@@ -748,27 +846,14 @@ int main(int argc, char **argv) {
     pa_params(fqf, starts, counts);
 
     // learn nt->nt transitions
-    double ntnt_prob[4][4] = {0};
-    for(int i = 0; i < 4; i++) {
-      for(int j = 0; j < 4; j++) {
-	if(i != j)
-	  ntnt_prob[i][j] = 1.0/3.0;
-      }
-    }
-    learn_errors(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
+    double ntnt_prob[max_qual][4][4] = {0};
+    for(int q = 0; q < max_qual; q++)
+      for(int i = 0; i < 4; i++)
+	for(int j = 0; j < 4; j++)
+	  if(i != j)
+	    ntnt_prob[q][i][j] = 1.0/3.0;
 
-    cout << "New error matrix:" << endl;
-    cout << "\tA\tC\tG\tT" << endl;
-    for(int i = 0; i < 4; i++) {
-      cout << nts[i];
-      for(int j = 0; j < 4; j++) {
-	if(i == j)
-	  cout << "\t-";
-	else
-	  cout << "\t" << setprecision(4) << ntnt_prob[i][j];
-      }
-      cout << endl;
-    }
+    learn_errors(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
 
     correct_reads(fqf, (f == fastqfs.size()-1), trusted, starts, counts, ntnt_prob, prior_prob);
 
