@@ -19,18 +19,24 @@ const static char* myopts = "r:f:m:c:a:t:q:p:z:ICh";
 static char* fastqf = NULL;
 // -f, file of fastq files of reads
 static char* file_of_fastqf = NULL;
+
 // -m, mer counts
 static char* merf = NULL;
+// -b, bithash
+static char* bithashf = NULL;
+
 // -c, cutoff between trusted and untrusted mers
 static double cutoff = 0;
 // -a, AT cutoff
 static char* ATcutf = NULL;
+
 // -q
 static int trimq = 3;
 // -I
 bool Read::illumina_qual = false;
 // -t
 static int trim_t = 30;
+
 // -p, number of threads
 static int threads = 4;
 // -z, zip mode directory
@@ -71,11 +77,14 @@ static void  Usage
 	   " -m <file>\n"
 	   "    File containg kmer counts in format `seq\tcount`.\n"
 	   "    Can also be piped in with '-'\n"
+	   " -b <file>\n"
+	   "    File containg saved bithash. Can also be piped in\n"
+	   "    with '-'\n"
 	   " -c <num>\n"
 	   "    Separate trusted/untrusted kmers at cutoff <num>\n"
 	   " -a <file>\n"
-	   "    Separate trusted/untrusted kmers as a function of\n"
-	   "    AT content, with cutoffs found in <file>, one per line\n"
+	   "    Separate trusted/untrusted kmers as a function of AT\n"
+	   "    content, with cutoffs found in <file>, one per line\n"
 	   " -p <num>\n"
 	   "    Use <num> openMP threads\n"
 	   " -t <num>=30\n"
@@ -111,6 +120,10 @@ static void parse_command_line(int argc, char **argv) {
 
     case 'm':
       merf = strdup(optarg);
+      break;
+
+    case 'b':
+      bithashf = strdup(optarg);
       break;
 
     case 'z':
@@ -192,10 +205,15 @@ static void parse_command_line(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  if(merf == NULL) {
-    cerr << "Must provide a file of kmer counts (-m)" << endl;
+  if(merf != NULL) {
+    if(cutoff == 0 && ATcutf == NULL) {
+      cerr << "Must provide a trusted/untrusted kmer cutoff (-c) or a file containing the cutoff as a function of the AT content (-a)" << endl;
+      exit(EXIT_FAILURE);
+    }
+  } else if(bithashf == NULL) {
+    cerr << "Must provide a file of kmer counts (-m) or a saved bithash (-b)" << endl;
     exit(EXIT_FAILURE);
-  }  
+  }
 }
 
 ////////////////////////////////////////////////////////////
@@ -250,7 +268,7 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
 //
 // Combine output files into one.
 ////////////////////////////////////////////////////////////
-static void combine_output(const char* outf, bool final) {
+static void combine_output(const char* outf) {
   ofstream combine_out(outf);
   char strt[10];
   char toutf[50];
@@ -396,8 +414,8 @@ void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max
 ////////////////////////////////////////////////////////////
 // correct_reads
 ////////////////////////////////////////////////////////////
-//static void correct_reads(string fqf, bool final, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
-static void correct_reads(string fqf, bool final, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
+//static void correct_reads(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
+static void correct_reads(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
   // format output file
   int suffix_index = fqf.rfind(".");
   string prefix = fqf.substr(0,suffix_index);
@@ -532,7 +550,7 @@ static void correct_reads(string fqf, bool final, bithash * trusted, vector<stre
     reads_in.close();
   }
   
-  combine_output(outf.c_str(), final);
+  combine_output(outf.c_str());
 }
 
 ////////////////////////////////////////////////////////////
@@ -691,7 +709,6 @@ void unzip_fastq(const char* fqf) {
   strcat(mycmd, fqf);
   strcat(mycmd, " > ");
   strncat(mycmd, fqf, strstr(fqf, ".gz") - fqf);
-  cout << mycmd << endl;
   system(mycmd);
 
   /*
@@ -724,7 +741,6 @@ void zip_fastq(const char* fqf) {
   strcat(mycmd, fqf);
   system(mycmd);
 
-  /*  Doesn't work with combining output in background.
   // determine output file
   string fqf_str(fqf);
   int suffix_index = fqf_str.rfind(".");
@@ -743,29 +759,6 @@ void zip_fastq(const char* fqf) {
   strcat(mycmd, ".gz ");
   strcat(mycmd, zipd);
   system(mycmd);
-  */
-}
-
-////////////////////////////////////////////////////////////
-// is_kmer_file
-//
-// Return true if the file is in the format "kmer\tcount",
-// else its probably a binary bithash dump file.
-////////////////////////////////////////////////////////////
-bool is_kmer_file(char* f) {
-  ifstream f_in(f);
-  string line;
-  getline(f_in, line);
-
-  char nt;
-  for(int i = 0; i < 5; i++) {
-    nt = line[0];
-    if(!(nt == 'A' || nt == 'C' || nt == 'G' || nt == 'T')) {
-      cout << "Reading -m file as bithash binary" << endl;
-      return false;
-    }
-  }
-  return true;
 }
 
 ////////////////////////////////////////////////////////////
@@ -782,12 +775,9 @@ int main(int argc, char **argv) {
 
   // make trusted kmer data structure
   bithash *trusted = new bithash();
-  if(is_kmer_file(merf)) {
-    if(cutoff == 0 && ATcutf == NULL) {
-      cerr << "Must provide a trusted/untrusted kmer cutoff (-c) or a file containing the cutoff as a function of the AT content (-a)" << endl;
-      exit(EXIT_FAILURE);
-    }
 
+  // kmer counts
+  if(merf != NULL) {
     if(ATcutf != NULL) {
       if(strcmp(merf,"-") == 0)
 	trusted->tab_file_load(cin, load_AT_cutoffs(), atgc);
@@ -803,11 +793,13 @@ int main(int argc, char **argv) {
 	trusted->tab_file_load(mer_in, cutoff, atgc);
       }
     }
-  } else {
-    // from from file
-    trusted->binary_file_input(merf, atgc);
-    cout << trusted->num_kmers() << " trusted kmers" << endl;
+
+  // saved bithash
+  } else if(bithashf != NULL) {
+    trusted->binary_file_input(bithashf, atgc);
   }
+  
+  cout << trusted->num_kmers() << " trusted kmers" << endl;
 
   double prior_prob[4];
   prior_prob[0] = (double)atgc[0] / (double)(atgc[0]+atgc[1]) / 2.0;
@@ -855,7 +847,7 @@ int main(int argc, char **argv) {
 
     learn_errors(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
 
-    correct_reads(fqf, (f == fastqfs.size()-1), trusted, starts, counts, ntnt_prob, prior_prob);
+    correct_reads(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
 
     if(zipd != NULL)
       zip_fastq(fqf.c_str());
