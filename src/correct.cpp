@@ -229,8 +229,8 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
 
   if(threads*chunks_per_thread > N) {
     // use 1 thread for everything
-    threads = 1;
     counts.push_back(N);
+    starts.push_back(0);
 
   } else {
     // determine counts per thread
@@ -240,25 +240,25 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
       sum += counts.back();
     }
     counts.push_back(N - sum);
-  }
 
-  // find start points
-  reads_in.open(fqf.c_str());
-  starts.push_back(reads_in.tellg());
-  unsigned long long s = 0;
-  unsigned int t = 0;
-  while(getline(reads_in,toss)) {
-    // sequence
-    getline(reads_in, toss);
-    // +
-    getline(reads_in, toss);
-    // quality
-    getline(reads_in, toss);
-
-    if(++s == counts[t] && s != N) {
-      starts.push_back(reads_in.tellg());
-      s = 0;
-      t++;
+    // find start points
+    reads_in.open(fqf.c_str());
+    starts.push_back(reads_in.tellg());
+    unsigned long long s = 0;
+    unsigned int t = 0;
+    while(getline(reads_in,toss)) {
+      // sequence
+      getline(reads_in, toss);
+      // +
+      getline(reads_in, toss);
+      // quality
+      getline(reads_in, toss);
+      
+      if(++s == counts[t] && s != N) {
+	starts.push_back(reads_in.tellg());
+	s = 0;
+	t++;
+      }
     }
   }
 }
@@ -644,9 +644,6 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 		    // P(actual=a|obs=o,a!=o)
 		    //ntnt_counts[iseq[cor.index]][cor.to]++;
 		    samples++;
-
-		    if(samples % 10000 == 0)
-		      cout << samples << endl;
 		  }
 		}
 	      }
