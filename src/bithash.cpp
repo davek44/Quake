@@ -290,6 +290,7 @@ void bithash::binary_file_input(char* inf, unsigned long long atgc[]) {
       for(int j = 0; j < 8; j++) {
 	if((temp & flag) == flag) {
 	  bits.set((buffersize*b + i)*8 + j);
+	  cout << ((buffersize*b + i)*8 + j) << endl;
 	  
 	  // count gc
 	  unsigned int at = count_at((buffersize*b + i)*8 + j);

@@ -75,11 +75,10 @@ static void  Usage
 	   " -f <file>\n"
 	   "    File containing fastq file names, one per line\n"
 	   " -m <file>\n"
-	   "    File containg kmer counts in format `seq\tcount`.\n"
+	   "    File containing kmer counts in format `seq\tcount`.\n"
 	   "    Can also be piped in with '-'\n"
 	   " -b <file>\n"
-	   "    File containg saved bithash. Can also be piped in\n"
-	   "    with '-'\n"
+	   "    File containing saved bithash.\n"
 	   " -c <num>\n"
 	   "    Separate trusted/untrusted kmers at cutoff <num>\n"
 	   " -a <file>\n"
@@ -796,7 +795,11 @@ int main(int argc, char **argv) {
 
   // saved bithash
   } else if(bithashf != NULL) {
-    trusted->binary_file_input(bithashf, atgc);
+    if(strcmp(bithashf,"-") == 0) {
+      cerr << "Saved bithash cannot be piped in.  Please specify file." << endl;
+      exit(EXIT_FAILURE);
+    } else
+      trusted->binary_file_input(bithashf, atgc);
   }
   
   cout << trusted->num_kmers() << " trusted kmers" << endl;
