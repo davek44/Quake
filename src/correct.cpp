@@ -14,7 +14,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:f:m:c:a:t:q:p:z:ICh";
+const static char* myopts = "r:f:m:b:c:a:t:q:p:z:ICh";
 // -r, fastq file of reads
 static char* fastqf = NULL;
 // -f, file of fastq files of reads
