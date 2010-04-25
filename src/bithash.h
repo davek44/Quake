@@ -7,9 +7,9 @@
 #include <bitset>
 using namespace::std;
 
-const int k = 17;
-//const unsigned long bitssize = 274877906944; // i.e. 4^19
-const unsigned long bitssize = 17179869184; // i.e. 4^17
+const int k = 19;
+const unsigned long bitssize = 274877906944; // i.e. 4^19
+//const unsigned long bitssize = 17179869184; // i.e. 4^17
 //const unsigned long bitssize = 1073741824;  // i.e. 4^15
 
 class bithash {

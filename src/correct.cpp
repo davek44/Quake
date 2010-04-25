@@ -44,7 +44,6 @@ static char* zipd = NULL;
 // -C, Contrail output
 static bool contrail_out = false;
 
-// PA_PARAMS WILL FAIL IF THREADS*CPT > NUM_READS
 static unsigned int chunks_per_thread = 200;
 
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
@@ -229,17 +228,19 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
   N /= 4ULL;
 
   if(threads*chunks_per_thread > N) {
-    cerr << N << " reads- too many threads and chunks!  Rewrite pa_params!" << endl;
-    exit(EXIT_FAILURE);
-  }
+    // use 1 thread for everything
+    threads = 1;
+    counts.push_back(N);
 
-  // determine counts per thread
-  unsigned long long sum = 0;
-  for(int i = 0; i < threads*chunks_per_thread-1; i++) {
-    counts.push_back(N / (threads*chunks_per_thread));
-    sum += counts.back();
+  } else {
+    // determine counts per thread
+    unsigned long long sum = 0;
+    for(int i = 0; i < threads*chunks_per_thread-1; i++) {
+      counts.push_back(N / (threads*chunks_per_thread));
+      sum += counts.back();
+    }
+    counts.push_back(N - sum);
   }
-  counts.push_back(N - sum);
 
   // find start points
   reads_in.open(fqf.c_str());
