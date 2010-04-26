@@ -10,6 +10,7 @@
 #include <omp.h>
 #include <cstdlib>
 #include <iomanip>
+#include <sys/stat.h>
 
 ////////////////////////////////////////////////////////////
 // options
@@ -90,7 +91,7 @@ static void  Usage
 	   " -q <num>=3\n"
 	   "    Use BWA trim parameter <num>\n"
 	   " -I\n"
-	   "    Use 64 scale Illumina quality values\n"
+	   "    Use 64 scale Illumina quality values (else base 33)\n"
            "\n");
 
    return;
@@ -230,7 +231,8 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
   if(threads*chunks_per_thread > N) {
     // use 1 thread for everything
     counts.push_back(N);
-    starts.push_back(0);
+    starts.push_back(0);   
+    omp_set_num_threads(1);
 
   } else {
     // determine counts per thread
@@ -259,6 +261,9 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
 	s = 0;
 	t++;
       }
+      
+      // set up parallelism
+      omp_set_num_threads(threads);
     }
   }
 }
@@ -273,17 +278,22 @@ static void combine_output(const char* outf) {
   char strt[10];
   char toutf[50];
   string line;
+  struct stat st_file_info;
+  
   for(int t = 0; t < threads; t++) {
     strcpy(toutf, outf);
     sprintf(strt,"%d",t);
     strcat(toutf, strt);
 
-    ifstream thread_out(toutf);
-    while(getline(thread_out, line))
-      combine_out << line << endl;
-    thread_out.close();
-
-    remove(toutf);
+    // if file exists, add to single output
+    if(stat(toutf, &st_file_info) == 0) {
+      ifstream thread_out(toutf);
+      while(getline(thread_out, line))
+	combine_out << line << endl;
+      thread_out.close();
+      
+      remove(toutf);
+    }
   }
 
   /*
@@ -548,6 +558,7 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
       }
     }
     reads_in.close();
+    reads_out.close();
   }
   
   combine_output(outf.c_str());
@@ -764,9 +775,6 @@ void zip_fastq(const char* fqf) {
 int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
-  // set up parallelism
-  omp_set_num_threads(threads);
-
   // count AT's and GC's
   unsigned long long atgc[2] = {0};
 
@@ -817,7 +825,7 @@ int main(int argc, char **argv) {
     ifstream ff(file_of_fastqf);
     string next_fastqf;
 
-    while(getline(ff, next_fastqf))
+    while(getline(ff, next_fastqf) && next_fastqf.size() > 0)
       fastqfs.push_back(next_fastqf);
   } else
     fastqfs.push_back(string(fastqf));
