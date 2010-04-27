@@ -31,7 +31,7 @@ cov_model.py <counts file>
 3. Correct reads
 
 To correct reads and output a set of corrected read fastq files, run
-the C++ program "correct".  The -r option takes a single fastq file,
+the C++ program 'correct'.  The -r option takes a single fastq file,
 and the -f option takes multiple fastq files by accepting a text file
 with the names of the fastq files, each on their own line.  If the
 fastq files are zipped, use the -z option and provide the directory
@@ -40,4 +40,12 @@ computation, and the -p option specifies the number of threads to use.
 Alternatively, this step can be performed using Hadoop.
 
 Command:
-correct -f <fastq list file> -c <cutoff> -m <counts file> -z -p 16
+correct -f <fastq list file> -c <cutoff> -m <counts file> -z /fs/attic/fastqdir -p 16
+
+
+If you expect to run 'correct' many times and have a large counts file,
+you can build the data structure used to store trusted kmers offline.
+
+Command:
+build_bithash -m <counts file> -c <cutoff> -o <bithash file>
+correct -f <fastq list file> -b <bithash file> -z /fs/attic/fastqdir -p 16
