@@ -5,7 +5,7 @@
 //////////////////////////////////////////////////////////////////////
 const char* myopts = "f:k:m:l:";
 // -f
-char* fastqfile = NULL;
+char* fastqfile = "-";
 // -k
 int Kmer_Len = 15;
 // -m

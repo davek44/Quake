@@ -107,9 +107,6 @@ static void parse_command_line(int argc, char **argv) {
       exit(1);
     }
   Forward_Mask = ((long long unsigned) 1 << (2 * Kmer_Len - 2)) - 1;
-
-  if(fastqfile == NULL)
-    cerr << "Must provide a fastq file (-f)" << endl;
 }
 
 //////////////////////////////////////////////////////////////////////

@@ -3,14 +3,13 @@ Correcting reads with this package requires 3 steps:
 1. Count kmers 
 
 Any program that can be made to produce a file where each line has
-"kmer\tcount" is fine.  I recommend count-kmers and count-qmers in the
-AMOS package which I've adjusted to accept fastq files.  count-qmers
-is a variation we've experimented with that determines the expected
-count of each kmer using the read quality values.  Both programs are
-single-threaded making them ill-suited for large genomes, but can
-easily be adapted to run in Hadoop for such genomes.  Another option
-is meryl in the Celera Assembler package, but it only accepts a single
-fasta file.
+"kmer\tcount" is fine.  I recommend the included programs count-kmers
+and count-qmers.  count-qmers is a variation we've experimented with
+that computes the expected count of each kmer using the read quality
+values.  Both programs are single-threaded making them ill-suited for
+large genomes, but can easily be adapted to run in Hadoop for such
+genomes.  Another option is meryl in the Celera Assembler package, but
+it only accepts a single fasta file.
 
 Recommended command:
 cat <fastq files> | count-qmers -k 18 > <counts file>
@@ -20,8 +19,11 @@ cat <fastq files> | count-qmers -k 18 > <counts file>
 Next, using a histogram of the kmer counts, find the coverage at which
 we will differentiate trusted and untrusted kmers.  cov_model.py will
 make the histogram and call an R script cov_model.r that will output
-the threshold.  Note that this R script requires the library VGAM to
-be installed which can be done with the install.packages command.
+the threshold.  Note that this R script requires the library VGAM
+which can be installed with the install.packages command in R.  You'll
+need to set the global variable 'r_dir' in cov_model.py to the
+directory where the R script will be.  And if you count kmers rather
+than qmers, use the option '--int'.
 
 Command:
 cov_model.py <counts file>
@@ -29,13 +31,13 @@ cov_model.py <counts file>
 3. Correct reads
 
 To correct reads and output a set of corrected read fastq files, run
-the C program "correct".  The -r option takes a single fastq file, and
-the -f option takes multiple fastq files by aceepting a text file with
-the names of the fastq files, each on their own line.  If the fastq
-files are zipped, use the -z option.  The program uses openMP to
-parallelize the computation, and the -p option specifies the number of
-threads to use.  Alternatively, this step can also be performed using
-Hadoop.
+the C++ program "correct".  The -r option takes a single fastq file,
+and the -f option takes multiple fastq files by accepting a text file
+with the names of the fastq files, each on their own line.  If the
+fastq files are zipped, use the -z option and provide the directory
+where they will be.  The program uses openMP to parallelize the
+computation, and the -p option specifies the number of threads to use.
+Alternatively, this step can be performed using Hadoop.
 
 Command:
 correct -f <fastq list file> -c <cutoff> -m <counts file> -z -p 16
