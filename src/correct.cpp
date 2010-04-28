@@ -453,7 +453,7 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
     char* nti;
     Read *r;
 
-    while(chunk < threads*chunks_per_thread) {
+    while(chunk < starts.size()) {
       #pragma omp critical
       tchunk = chunk++;
 
