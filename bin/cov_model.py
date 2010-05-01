@@ -60,7 +60,7 @@ def model_cutoff(ctsf):
             print >> cov_out, '%d\t%d' % (cov+1,kmer_hist[cov])
     cov_out.close()
 
-    os.system('R --slave << %s/cov_model.r 2> r.log' % r_dir)
+    os.system('R --slave < %s/cov_model.r 2> r.log' % r_dir)
 
 
 ############################################################
