@@ -32,6 +32,8 @@ max.cov = max(cov[,1])
 # model 
 ############################################################
 model = function(params) {
+  print(params)
+  
   zp.copy = params[1]
   p.e = params[2]
   shape.e = params[3]
@@ -53,6 +55,7 @@ model = function(params) {
   }
 
   logprobs = log(apply(kmers.probs, 1, sum))
+  print(sum(logprobs*cov[,2]))
   return(list(like=-sum(logprobs*cov[,2]), probs=kmers.probs))
 }
 
@@ -96,12 +99,12 @@ cutoffs = function(p) {
 # action
 ############################################################
 init = c(2, .9, 2, 50, 300)
-ol = c(.001, 0, 0.001, -Inf, 10)
-ou = c(10, 1, Inf, Inf, Inf)
+ol = c(.001, 0, 0.001, 0, 10)
+ou = c(10, 1, 1000, 1000, Inf)
 opt = optim(init, function(x) model(x)$like, lower=ol, upper=ou, method="L-BFGS-B", control=list(trace=1, maxit=1000))
 cat('value:',opt$value,"\n")
 p=display.params(opt$par, F)
-cut = min((1:40)[cutoffs(p) < 1000])
+cut = min((1:40)[cutoffs(p) < 100])
 cat(cut,"\n", file=outf)
 display.params(opt$par, T)
 write(cutoffs(p), file=outf, append=T)
