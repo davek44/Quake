@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:f:m:b:c:a:t:q:p:z:ICh";
+const static char* myopts = "r:f:m:b:c:a:t:q:p:z:ICuh";
 // -r, fastq file of reads
 static char* fastqf = NULL;
 // -f, file of fastq files of reads
@@ -42,8 +42,11 @@ static int trim_t = 30;
 static int threads = 4;
 // -z, zip mode directory
 static char* zipd = NULL;
+
 // -C, Contrail output
 static bool contrail_out = false;
+// -u, output uncorrected reads
+static bool uncorrected_out = false;
 
 static unsigned int chunks_per_thread = 200;
 
@@ -92,6 +95,8 @@ static void  Usage
 	   "    Use BWA trim parameter <num>\n"
 	   " -I\n"
 	   "    Use 64 scale Illumina quality values (else base 33)\n"
+	   " -u\n"
+	   "    Output errors reads even if they can't be corrected\n"
            "\n");
 
    return;
@@ -164,6 +169,10 @@ static void parse_command_line(int argc, char **argv) {
     case 'C':
       contrail_out = true;
       break;
+
+    case 'u':
+      uncorrected_out = true;
+      break;  
 
     case 'p':
       threads = int(strtol(optarg, &p, 10));
@@ -509,6 +518,9 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
 	    } else {
 	      if(TESTING)
 		cerr << header << "\t" << ntseq << "\t." << endl;
+	      if(uncorrected_out)
+		// output read with error message
+		reads_out << header << " error" << endl << ntseq << endl << mid << endl << strqual << endl;
 	    }
 	    
 	  } else {
@@ -541,6 +553,9 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
 	    } else {
 	      if(TESTING)
 		cerr << header << "\t" << ntseq << "\t-" << endl;
+	      if(uncorrected_out)
+		// output read with error message
+		reads_out << header << " error" << endl << ntseq << endl << mid << endl << strqual << endl;	      
 	    }
 	  }
 	  

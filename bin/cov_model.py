@@ -97,8 +97,6 @@ def model_q_cutoff(ctsf, sample):
 # GC value
 ############################################################
 def model_q_gc_cutoffs(ctsf, sample): 
-    print ctsf
-
     # input coverages
     k = 0
     for line in open(ctsf):
@@ -131,7 +129,7 @@ def model_q_gc_cutoffs(ctsf, sample):
             print >> out, rc
         out.close()
 
-        os.system('R --slave < %s/cov_model_qmer.r 2> r.log' % r_dir)
+        os.system('R --slave < %s/cov_model_qmer.r 2> r%d.log' % (r_dir,at))
 
         at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
         if at in [1,k-1]:   # setting extremes to next closests
