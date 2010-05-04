@@ -19,11 +19,6 @@ outf = "cutoff.txt"
 max.copy = 30
 
 ############################################################
-# load data
-############################################################
-cov = scan("kmers.txt")
-
-############################################################
 # est.cov
 #
 # Estimate the coverage mean by finding the max past the
@@ -31,7 +26,7 @@ cov = scan("kmers.txt")
 ############################################################
 est.cov = function(d) {
   # make histogram
-  hc = hist(d, breaks=seq(0,round(max(d))+1,1, plot=F))$counts
+  hc = hist(d, breaks=seq(0,round(max(d))+1,1), plot=F)$counts
 
   # find first valley (or right before it)
   valley = hc[1]
@@ -55,8 +50,10 @@ est.cov = function(d) {
 }
 
 ############################################################
-# filter data
+# load data
 ############################################################
+cov = scan("kmers.txt")
+
 cov.est = est.cov(cov)
 
 # filter extremes from kmers
@@ -125,7 +122,7 @@ ratios = function(cov, p) {
 }
 
 cutoff = function(p) {
-  ratio.goal = 300
+  ratio.goal = 100
   cov.best = 0
   ratio.best = abs(ratios(0,p) - ratio.goal)
   for(c in seq(0,30,.02)) {
@@ -134,7 +131,7 @@ cutoff = function(p) {
       ratio.best = r
       cov.best = c
     }
-    cat(c," ",ratios(c,p),"\n")
+    #cat(c," ",ratios(c,p),"\n")
   }
   return(cov.best)
 }
@@ -142,9 +139,9 @@ cutoff = function(p) {
 ############################################################
 # action
 ############################################################
-init = c(.5, .85, 5, cov.est, 2*cov.est)
-ol = c(.001, 0, 0.001, -Inf, 10)
-ou = c(10, 1, Inf, Inf, Inf)
+init = c(2, .9, 2, cov.est, 3*cov.est)
+ol = c(.001, .001, 0.001, 0, 10)
+ou = c(20, .999, 20, 1000, Inf)
 opt = optim(init, function(x) model(x)$like, lower=ol, upper=ou, method="L-BFGS-B", control=list(trace=1, maxit=1000))
 cat('value:',opt$value,"\n")
 p=display.params(opt$par, F)

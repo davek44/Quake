@@ -16,17 +16,49 @@
 library(VGAM)
 
 outf = "cutoff.txt"
+max.copy = 30
+
+
+############################################################
+# est.cov
+#
+# Estimate the coverage mean by finding the max past the
+# first valley.
+############################################################
+est.cov = function(d) {
+  hc = d[,2]
+  
+  # find first valley (or right before it)
+  valley = hc[1]
+  i = 2
+  while(hc[i] < valley) {
+    valley = hc[i]
+    i = i + 1
+  }
+
+  # return max over the rest
+  max.hist = hc[i]
+  max.cov = i
+  while(i <= length(hc)) {
+    if(hc[i] > max.hist) {
+      max.hist = hc[i]
+      max.cov = i
+    }
+    i = i + 1
+  }
+  return( max.cov )
+}
 
 ############################################################
 # load data
 ############################################################
 cov = read.table('kmers.hist')[,1:2]
-cov.estimate = 100
-max.copy = 25
+cov.est = est.cov(cov)
 
 # filter extremes from kmers
-cov = cov[cov[,1] < 1.25*max.copy*cov.estimate,]
+cov = cov[cov[,1] < 1.25*max.copy*cov.est,]
 max.cov = max(cov[,1])
+
 
 ############################################################
 # model 
@@ -98,9 +130,9 @@ cutoffs = function(p) {
 ############################################################
 # action
 ############################################################
-init = c(2, .9, 2, 50, 300)
-ol = c(.001, 0, 0.001, 0, 10)
-ou = c(10, 1, 1000, 1000, Inf)
+init = c(2, .9, 2, cov.est, 5*cov.est)
+ol = c(.001, .001, 0.001, 0, 10)
+ou = c(20, .999, 20, 1000, Inf)
 opt = optim(init, function(x) model(x)$like, lower=ol, upper=ou, method="L-BFGS-B", control=list(trace=1, maxit=1000))
 cat('value:',opt$value,"\n")
 p=display.params(opt$par, F)

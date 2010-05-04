@@ -32,7 +32,7 @@ def main():
     if not options.k:
         parser.error('Must provide k-mer size with -k')
 
-    if qmers:
+    if options.counted_qmers:
         ctsf = '%s.qcts' % os.path.splitext( os.path.split(options.readsf)[1] )[0]
     else:
         ctsf = '%s.cts' % os.path.splitext( os.path.split(options.readsf)[1] )[0]
@@ -50,7 +50,7 @@ def main():
         # model coverage
         if options.counted_qmers:
             if options.model_gc:
-                cov_model.model_q_gc_cutoffs(ctsf, 15000)
+                cov_model.model_q_gc_cutoffs(ctsf, 10000)
             else:
                 cov_model.model_q_cutoff(ctsf, 20000)
         else:
@@ -90,8 +90,10 @@ def count_kmers_meryl(readsf, k, ctsf, proc=1):
 # Count kmers in the reads file using AMOS count-kmers
 ############################################################
 def count_kmers_amos(readsf, k, ctsf, iq):
-    kmerf = os.path.splitext( os.path.split(readsf)[1] )[0]
-    os.system('cat %s | count-kmers-q -k %d %s > %s' % (readsf, k, iq, ctsf))
+    if ctsf[-4:] == 'qcts':
+        os.system('cat %s | count-qmers -k %d %s > %s' % (readsf, k, iq, ctsf))
+    else:
+        os.system('cat %s | count-kmers -k %d %s > %s' % (readsf, k, iq, ctsf))
     
             
 ############################################################
