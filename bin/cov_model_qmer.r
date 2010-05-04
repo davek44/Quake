@@ -114,7 +114,7 @@ display.params = function(x, print) {
 # makes the ratio of error probability to nonerror
 # probability closest to ratio.goal
 ############################################################
-ratios = function(cov, p) {
+ratios = function(cov, p) {  
   dcopy = dzeta(1:max.copy, p=p$zp.copy)
   error = p$p.e * dpareto(1+cov, loc.e, p$shape.e)
   no.error = 0
@@ -125,7 +125,7 @@ ratios = function(cov, p) {
 }
 
 cutoff = function(p) {
-  ratio.goal = 100
+  ratio.goal = exp(3 + .05*p$u.v)
   cov.best = 0
   ratio.best = abs(ratios(0,p) - ratio.goal)
   for(c in seq(0,30,.02)) {
@@ -149,6 +149,7 @@ init = c(2, .9, 2, cov.est, 3*cov.est)
 opt = optim(init, function(x) model(x)$like, method="BFGS", control=list(trace=1, maxit=1000))
 cat('value:',opt$value,"\n")
 p=display.params(opt$par, F)
+
 cut = cutoff(p)
 cat(cut,"\n", file=outf)
 display.params(opt$par, T)
