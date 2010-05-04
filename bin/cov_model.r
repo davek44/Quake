@@ -71,6 +71,9 @@ model = function(params) {
   shape.e = params[3]
   u.v = params[4]
   var.v = params[5]
+
+  if(zp.copy <= 0 | shape.e <= 0 | var.v <= 0)
+    return(list(like=-Inf))
   
   dcopy = dzeta(1:max.copy, p=zp.copy)
   
@@ -130,10 +133,11 @@ cutoffs = function(p) {
 ############################################################
 # action
 ############################################################
-init = c(2, .9, 2, cov.est, 5*cov.est)
-ol = c(.001, .001, 0.001, 0, 10)
-ou = c(20, .999, 20, 1000, Inf)
-opt = optim(init, function(x) model(x)$like, lower=ol, upper=ou, method="L-BFGS-B", control=list(trace=1, maxit=1000))
+init = c(3, .9, 3, cov.est, 5*cov.est)
+#ol = c(.001, .001, 0.001, 0, 10)
+#ou = c(20, .999, 20, 1000, Inf)
+#opt = optim(init, function(x) model(x)$like, lower=ol, upper=ou, method="L-BFGS-B", control=list(trace=1, maxit=1000))
+opt = optim(init, function(x) model(x)$like, method="BFGS", control=list(trace=1, maxit=5000))
 cat('value:',opt$value,"\n")
 p=display.params(opt$par, F)
 cut = min((1:40)[cutoffs(p) < 100])
