@@ -125,7 +125,8 @@ ratios = function(cov, p) {
 }
 
 cutoff = function(p) {
-  ratio.goal = exp(3 + .05*p$u.v)
+  #ratio.goal = exp(3 + .05*p$u.v)
+  ratio.goal = 10
   cov.best = 0
   ratio.best = abs(ratios(0,p) - ratio.goal)
   for(c in seq(0,30,.02)) {

@@ -532,6 +532,14 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
 	      if(contrail_out)
 		reads_out << header << "\t" << corseq << endl;
 	      else {
+		// set corrected base quality values to 2
+		for(int q = 0; q < corseq.size(); q++)
+		  if(corseq[q] != ntseq[q])
+		    if(Read::illumina_qual)
+		      strqual[q] = 'B';
+		    else
+		      strqual[q] = '#';
+
 		unsigned int trimlen = ntseq.size()-corseq.size();
 		if(trimlen > 0) {
 		  // trimmed

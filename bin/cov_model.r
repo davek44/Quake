@@ -142,7 +142,7 @@ cat('value:',opt$value,"\n")
 p=display.params(opt$par, F)
 
 like.ratio.t = exp(3 + .05*p$u.v)
-cut = min((1:40)[cutoffs(p) < 100])
+cut = min((1:40)[cutoffs(p) < like.ratio.t])
 cat(cut,"\n", file=outf)
 
 display.params(opt$par, T)

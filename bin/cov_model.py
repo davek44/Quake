@@ -30,10 +30,10 @@ def main():
             model_q_gc_cutoffs(ctsf, 10000)
         else:
             model_q_cutoff(ctsf, 25000)
+            print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
     else:
         model_cutoff(ctsf)
-
-    print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
+        print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
 
 
 ############################################################
