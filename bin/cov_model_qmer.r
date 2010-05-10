@@ -1,5 +1,5 @@
 ############################################################
-# kmer_model.r
+# kmer_model_qmer.r
 #
 # Read in a file full of kmer coverages, and optimize
 # a probabilistic model in which kmer coverage is simulated
@@ -7,7 +7,7 @@
 #
 # 1. Choose error or no as binomial(p.e)
 # 2. Choose copy number as zeta(zp.copy)
-# 3a. If error, choose coverage as pareto(shape.e)
+# 3a. If error, choose coverage as gamma(shape.e, scale.e)
 # 3b. If not, choose coverage as normal(copy*u.v, copy*var.v)
 #
 # Finally, output the ratio of being an error kmer vs being
@@ -60,20 +60,23 @@ cov.est = est.cov(cov)
 cov = cov[cov < 1.25*max.copy*cov.est]
 max.cov = max(cov)
 
-loc.e = 1+min(cov)-1e-6
+# add epsilon to zeroes
+cov[cov == 0] = 1e-12
 
 
 ############################################################
 # model 
 ############################################################
 model = function(params) {
+  #print(params)
   zp.copy = params[1]
   p.e = params[2]
   shape.e = params[3]
-  u.v = params[4]
-  var.v = params[5]
+  scale.e = params[4]
+  u.v = params[5]
+  var.v = params[6]
 
-  if(zp.copy <= 0 | shape.e <= 0 | var.v <= 0)
+  if(zp.copy <= 0 | p.e <= 0 | p.e >= 1 | shape.e <= 0 | scale.e <= 0 | var.v <= 0)
     return(list(like=-Inf))
   
   dcopy = dzeta(1:max.copy, p=zp.copy)
@@ -81,7 +84,7 @@ model = function(params) {
   kmers.probs = matrix(0, nrow=length(cov), ncol=(max.copy+1))
 
   # error
-  kmers.probs[,1] = p.e * dpareto(1+cov, loc.e, shape.e)
+  kmers.probs[,1] = p.e * dgamma(cov, shape=shape.e, scale=scale.e)
 
   # no error
   for(copy in 1:max.copy) {
@@ -89,6 +92,7 @@ model = function(params) {
   }
 
   logprobs = log(apply(kmers.probs, 1, sum))
+  #print(sum(logprobs))
   return(list(like=-sum(logprobs), probs=kmers.probs))
 }
 
@@ -101,10 +105,11 @@ display.params = function(x, print) {
     cat("zp.copy: ",x[1],"\n", file=outf, append=T)
     cat("p.e: ",x[2],"\n", file=outf, append=T)
     cat("shape.e: ",x[3],"\n", file=outf, append=T)
-    cat("u.v: ",x[4],"\n", file=outf, append=T)
-    cat("var.v: ",x[5],"\n", file=outf, append=T)
+    cat("scale.e: ",x[4],"\n", file=outf, append=T)
+    cat("u.v: ",x[5],"\n", file=outf, append=T)
+    cat("var.v: ",x[6],"\n", file=outf, append=T)
   }
-  return(list(zp.copy=x[1], p.e=x[2], shape.e=x[3], u.v=x[4], var.v=x[5]))
+  return(list(zp.copy=x[1], p.e=x[2], shape.e=x[3], scale.e=x[4], u.v=x[5], var.v=x[6]))
 }
 
 ############################################################
@@ -116,7 +121,7 @@ display.params = function(x, print) {
 ############################################################
 ratios = function(cov, p) {  
   dcopy = dzeta(1:max.copy, p=p$zp.copy)
-  error = p$p.e * dpareto(1+cov, loc.e, p$shape.e)
+  error = p$p.e * dgamma(cov, shape=p$shape.e, scale=p$scale.e)
   no.error = 0
   for(copy in 1:max.copy) {
     no.error = no.error + dcopy[copy] * (1-p$p.e) * dnorm(cov, mean=(copy*p$u.v), sd=sqrt(copy*p$var.v))
@@ -126,7 +131,7 @@ ratios = function(cov, p) {
 
 cutoff = function(p) {
   #ratio.goal = exp(3 + .05*p$u.v)
-  ratio.goal = 10
+  ratio.goal = 100
   cov.best = 0
   ratio.best = abs(ratios(0,p) - ratio.goal)
   for(c in seq(0,30,.02)) {
@@ -143,7 +148,7 @@ cutoff = function(p) {
 ############################################################
 # action
 ############################################################
-init = c(2, .9, 2, cov.est, 3*cov.est)
+init = c(2, .9, .8, .5, cov.est, 3*cov.est)
 #ol = c(.001, .001, 0.001, 0, 10)
 #ou = c(20, .999, 20, 1000, Inf)
 #opt = optim(init, function(x) model(x)$like, lower=ol, upper=ou, method="L-BFGS-B", control=list(trace=1, maxit=1000))
@@ -161,11 +166,12 @@ dcopy = dzeta(1:max.copy, p=p$zp.copy)
   
 kmers.probs = matrix(0, nrow=max.x, ncol=(max.copy+1))
 # error
-kmers.probs[,1] = p$p.e * (ppareto(2:251, loc.e, p$shape.e) - ppareto(1:250, loc.e, p$shape.e))
+#kmers.probs[,1] = p$p.e * (ppareto(2:251, loc.e, p$shape.e) - ppareto(1:250, loc.e, p$shape.e))
+kmers.probs[,1] = p$p.e * (pgamma(1:250, shape=p$shape.e, scale=p$scale.e) - pgamma(0:249, shape=p$shape.e, scale=p$scale.e))
 
 # no error
 for(copy in 1:max.copy) {
-  kmers.probs[,1+copy] = dcopy[copy] * (1-p$p.e) * dnorm(1:250, mean=(copy*p$u.v), sd=sqrt(copy*p$var.v))
+  kmers.probs[,1+copy] = dcopy[copy] * (1-p$p.e) * (pnorm(1:250, mean=(copy*p$u.v), sd=sqrt(copy*p$var.v)) - pnorm(0:249, mean=(copy*p$u.v), sd=sqrt(copy*p$var.v)))
 }
 
 all.dist = apply(kmers.probs, 1, sum)

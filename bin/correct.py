@@ -52,7 +52,7 @@ def main():
             if options.model_gc:
                 cov_model.model_q_gc_cutoffs(ctsf, 10000)
             else:
-                cov_model.model_q_cutoff(ctsf, 20000)
+                cov_model.model_q_cutoff(ctsf, 25000)
         else:
             cov_model.model_cutoff(ctsf)
 

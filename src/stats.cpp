@@ -17,14 +17,14 @@ struct eqstr {
   }
 };
 
-namespace HASHMAP                                                                                 
-{                                                                                             
-  template<> struct hash< std::string >                                                       
-  {                                                                                           
-    size_t operator()( const std::string& x ) const                                           
-    {                                                                                         
-      return HASHMAP::hash< const char* >()( x.c_str() );                                              
-    }                                                                                         
+namespace HASHMAP
+{
+  template<> struct hash< std::string >
+  {
+    size_t operator()( const std::string& x ) const
+    {
+      return HASHMAP::hash< const char* >()( x.c_str() );
+    }
   };
 }          
 

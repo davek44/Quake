@@ -135,6 +135,7 @@ int  main (int argc, char * argv [])
   string s, q, tag;
   unsigned long mb_limit = (unsigned long)(1024.0*gb_limit);
   unsigned long kmer_limit = mb_limit * 1048576UL / (unsigned long)bytes_per_kmer;
+  unsigned int proc_seq = 0;
   
   while(Fastq_Read(fp, s, tag, q)) {
     CountMers(s, q, mer_table);
@@ -145,6 +146,10 @@ int  main (int argc, char * argv [])
       // clear table
       mer_table.clear();
     }
+    /*if(++proc_seq == 1000000) {
+      cerr << ".";
+      proc_seq = 0;
+      }*/
   }
 
   cerr << COUNT << " sequences processed, " << LEN << " bp scanned" << endl;
