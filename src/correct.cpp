@@ -16,6 +16,11 @@
 // options
 ////////////////////////////////////////////////////////////
 const static char* myopts = "r:f:m:b:c:a:t:q:p:z:ICuh";
+static struct option  long_options [] = {
+  {"headers", 0, 0, 1000},
+  {0, 0, 0, 0}
+};
+
 // -r, fastq file of reads
 static char* fastqf = NULL;
 // -f, file of fastq files of reads
@@ -42,6 +47,9 @@ static int trim_t = 30;
 static int threads = 4;
 // -z, zip mode directory
 static char* zipd = NULL;
+
+// --headers, Print only normal headers
+static bool orig_headers = false;
 
 // -C, Contrail output
 static bool contrail_out = false;
@@ -97,6 +105,9 @@ static void  Usage
 	   "    Use 64 scale Illumina quality values (else base 33)\n"
 	   " -u\n"
 	   "    Output errors reads even if they can't be corrected\n"
+	   " --headers\n"
+	   "    Output only the original read headers without\n"
+	   "    correction messages\n"
            "\n");
 
    return;
@@ -109,10 +120,12 @@ static void parse_command_line(int argc, char **argv) {
   bool errflg = false;
   int ch;
   optarg = NULL;
+  int option_index = 0;
   char* p;
   
   // parse args
-  while(!errflg && ((ch = getopt(argc, argv, myopts)) != EOF)) {
+  while(!errflg && ((ch = getopt_long(argc, argv, myopts, long_options, &option_index)) != EOF)) {
+  //while(!errflg && ((ch = getopt(argc, argv, myopts)) != EOF)) {
     switch(ch) {
     case 'r':
       fastqf = strdup(optarg);
@@ -180,6 +193,10 @@ static void parse_command_line(int argc, char **argv) {
 	fprintf(stderr, "Bad number of threads \"%s\"\n",optarg);
 	errflg = true;
       }
+      break;
+
+    case 1000:
+      orig_headers = true;
       break;
 
     case 'h':
@@ -430,6 +447,62 @@ void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max
   }
 }
 
+
+////////////////////////////////////////////////////////////
+// output_read
+//
+// Output the given possibly corrected and/or trimmed
+// read according to the given options.
+////////////////////////////////////////////////////////////
+static void output_read(ofstream & reads_out, string header, string ntseq, string mid, string strqual, string corseq) {
+  if(corseq.size() >= trim_t) {
+    // check for changes
+    bool corrected = false;
+    for(int i = 0; i < corseq.size(); i++) {
+      if(corseq[i] != ntseq[i]) {
+	corrected = true;
+	// set qual to crap
+	if(Read::illumina_qual)
+	  strqual[i] = 'B';
+	else
+	  strqual[i] = '#';
+      }
+    }
+    // update header
+    if(!orig_headers) {
+      if(corrected)
+	header += " correct";
+      unsigned int trimlen = ntseq.size()-corseq.size();
+      if(trimlen > 0) {
+	stringstream trim_inter;
+	trim_inter << trimlen;
+	header += " trim=" + trim_inter.str();
+      }
+    }
+    // print
+    if(contrail_out)
+      reads_out << header << "\t" << corseq << endl;
+    else
+      reads_out << header << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
+    if(TESTING)
+      cerr << header << "\t" << ntseq << "\t" << corseq << endl;
+  } else {
+    if(uncorrected_out) {
+      // update header
+      if(!orig_headers)
+	header += " error";
+      //print
+      if(contrail_out)
+	reads_out << header << "\t" << ntseq << endl;
+      else
+	reads_out << header << endl << ntseq << endl << mid << endl << strqual << endl;	  
+    }
+    if(TESTING)
+      cerr << header << "\t" << ntseq << "\t-" << endl; // or . if it's only trimmed?
+  }
+}
+
+
 ////////////////////////////////////////////////////////////
 // correct_reads
 ////////////////////////////////////////////////////////////
@@ -501,71 +574,14 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
 	  r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
 	  
 	  // try to trim
-	  corseq = r->trim(trimq);	
-	  
-	  if(r->untrusted.empty()) {
-	    // long enough?
-	    if(corseq.size() >= trim_t) {
-	      if(contrail_out)
-		reads_out << header << "\t" << corseq << endl;
-	      else
-		reads_out << header << " trim=" << (ntseq.size()-corseq.size()) << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
-	      
-	      if(TESTING)
-		cerr << header << "\t" << ntseq << "\t" << corseq << endl;
-	      
-	      // else throw away
-	    } else {
-	      if(TESTING)
-		cerr << header << "\t" << ntseq << "\t." << endl;
-	      if(uncorrected_out)
-		// output read with error message
-		reads_out << header << " error" << endl << ntseq << endl << mid << endl << strqual << endl;
-	    }
-	    
-	  } else {
-	    // if still untrusted, correct
-	    corseq = r->correct(trusted, ntnt_prob, prior_prob);
-	    
-	    // if trimmed to long enough
-	    if(corseq.size() >= trim_t) {
-	      if(contrail_out)
-		reads_out << header << "\t" << corseq << endl;
-	      else {
-		// set corrected base quality values to 2
-		for(int q = 0; q < corseq.size(); q++)
-		  if(corseq[q] != ntseq[q])
-		    if(Read::illumina_qual)
-		      strqual[q] = 'B';
-		    else
-		      strqual[q] = '#';
+	  corseq = r->trim(trimq);
 
-		unsigned int trimlen = ntseq.size()-corseq.size();
-		if(trimlen > 0) {
-		  // trimmed
-		  if(corseq == ntseq.substr(0,corseq.size()))
-		    // w/o changes
-		    reads_out << header << " trim=" << trimlen << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
-		  else
-		    // w/ changes
-		    reads_out << header << " correct trim=" << trimlen << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
-		} else
-		  // not trimmed
-		  reads_out << header << " correct" << endl << corseq << endl << mid << endl << strqual.substr(0,corseq.size()) << endl;
-	      }
-	      
-	      if(TESTING)
-		cerr << header << "\t" << ntseq << "\t" << corseq << endl;
-	      
-	      // else throw away
-	    } else {
-	      if(TESTING)
-		cerr << header << "\t" << ntseq << "\t-" << endl;
-	      if(uncorrected_out)
-		// output read with error message
-		reads_out << header << " error" << endl << ntseq << endl << mid << endl << strqual << endl;	      
-	    }
-	  }
+	  // if still untrusted, correct
+	  if(!r->untrusted.empty())
+	    corseq = r->correct(trusted, ntnt_prob, prior_prob);
+
+	  // output read w/ trim and corrections
+	  output_read(reads_out, header, ntseq, mid, strqual, corseq);
 	  
 	  delete r;
 	} else {
@@ -586,6 +602,7 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
   
   combine_output(outf.c_str());
 }
+
 
 ////////////////////////////////////////////////////////////
 // learn_errors
