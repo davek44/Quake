@@ -18,6 +18,7 @@ def main():
     parser = OptionParser()
     parser.add_option('--int', dest='counted_qmers', action='store_false', default=True, help='Kmers were counted as integers w/o the use of quality values')
     parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help='Model kmer coverage as a function of GC content of kmers')
+    parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff')
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
@@ -27,12 +28,12 @@ def main():
 
     if options.counted_qmers:
         if options.model_gc:
-            model_q_gc_cutoffs(ctsf, 10000)
+            model_q_gc_cutoffs(ctsf, 10000, options.ratio)
         else:
-            model_q_cutoff(ctsf, 25000)
+            model_q_cutoff(ctsf, 25000, options.ratio)
             print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
     else:
-        model_cutoff(ctsf)
+        model_cutoff(ctsf, options.ratio)
         print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
 
 
@@ -41,7 +42,7 @@ def main():
 #
 # Make a histogram of kmers to give to R to learn the cutoff
 ############################################################
-def model_cutoff(ctsf):
+def model_cutoff(ctsf, ratio):
     # make kmer histogram
     cov_max = 0
     for line in open(ctsf):
@@ -60,7 +61,7 @@ def model_cutoff(ctsf):
             print >> cov_out, '%d\t%d' % (cov+1,kmer_hist[cov])
     cov_out.close()
 
-    os.system('R --slave < %s/cov_model.r 2> r.log' % r_dir)
+    os.system('R --slave --args %d < %s/cov_model.r 2> r.log' % (ratio,r_dir))
 
 
 ############################################################
@@ -68,7 +69,7 @@ def model_cutoff(ctsf):
 #
 # Sample kmers to give to R to learn the cutoff
 ############################################################
-def model_q_cutoff(ctsf, sample):
+def model_q_cutoff(ctsf, sample, ratio):
     # input coverages
     covs = []
     for line in open(ctsf):
@@ -87,7 +88,7 @@ def model_q_cutoff(ctsf, sample):
         print >> out, rc
     out.close()
 
-    os.system('R --slave < %s/cov_model_qmer.r 2> r.log' % r_dir)
+    os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,r_dir))
 
 
 ############################################################
@@ -96,7 +97,7 @@ def model_q_cutoff(ctsf, sample):
 # Sample kmers to give to R to learn the cutoff for each
 # GC value
 ############################################################
-def model_q_gc_cutoffs(ctsf, sample): 
+def model_q_gc_cutoffs(ctsf, sample, ratio):
     # input coverages
     k = 0
     for line in open(ctsf):
@@ -129,7 +130,7 @@ def model_q_gc_cutoffs(ctsf, sample):
             print >> out, rc
         out.close()
 
-        os.system('R --slave < %s/cov_model_qmer.r 2> r%d.log' % (r_dir,at))
+        os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,r_dir,at))
 
         at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
         if at in [1,k-1]:   # setting extremes to next closests

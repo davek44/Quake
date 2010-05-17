@@ -15,6 +15,13 @@
 ############################################################
 library(VGAM)
 
+# get ratio from input
+if(length(commandArgs(trailingOnly=TRUE)) > 0) {
+  ratio.goal = as.integer(commandArgs(trailingOnly=TRUE)[1])
+} else {
+  ratio.goal = 1000
+}
+
 outf = "cutoff.txt"
 max.copy = 30
 
@@ -131,7 +138,7 @@ ratios = function(cov, p) {
 
 cutoff = function(p) {
   #ratio.goal = exp(3 + .05*p$u.v)
-  ratio.goal = 100
+  #ratio.goal = 1000
   cov.best = 0
   ratio.best = abs(ratios(0,p) - ratio.goal)
   for(c in seq(0,30,.02)) {

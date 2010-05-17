@@ -100,7 +100,7 @@ class Read {
   vector<int> untrusted;
   corrected_read *trusted_read;
 
-  const static float trust_spread_t = .2;
+  const static float trust_spread_t = .1;
   const static float correct_min_t = .000001;
   const static float learning_min_t = .00001;
   static bool illumina_qual;

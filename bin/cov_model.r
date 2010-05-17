@@ -141,7 +141,7 @@ opt = optim(init, function(x) model(x)$like, method="BFGS", control=list(trace=1
 cat('value:',opt$value,"\n")
 p=display.params(opt$par, F)
 
-like.ratio.t = exp(3 + .05*p$u.v)
+like.ratio.t = 1000
 cut = min((1:40)[cutoffs(p) < like.ratio.t])
 cat(cut,"\n", file=outf)
 
