@@ -2,6 +2,7 @@
 #include "bithash.h"
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include <string>
 #include <string.h>
@@ -9,15 +10,14 @@
 #include <omp.h>
 #include <cstdlib>
 #include <iomanip>
+#include <sys/stat.h>
 
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:o:t:q:p:I";
+const static char* myopts = "r:t:q:p:Ih";
 // -r, fastq file of reads
 static char* fastqf = NULL;
-// -o, output file
-static char* outf = "out.txt";
 // -q
 static int trimq = 3;
 // -I
@@ -27,45 +27,34 @@ static int trim_t = 30;
 // -p, number of threads
 static int threads = 4;
 
-// Note: to not trim, set trimq=0 and trim_t>read_length-k
-
 // constants
 static const char* nts = "ACGTN";
 
-static void  Usage
-    (char * command)
-
+////////////////////////////////////////////////////////////
+// Usage
+//
 //  Print to stderr description of options and command line for
 //  this program.   command  is the command that was used to
 //  invoke it.
-
-  {
-   fprintf (stderr,
-           "USAGE:  build-icm [options] output_file < input-file\n"
+////////////////////////////////////////////////////////////
+static void  Usage(char * command)
+{
+  fprintf (stderr,
+           "USAGE:  trim [options]\n"
            "\n"
-           "Read sequences from standard input and output to  output-file\n"
-           "the interpolated context model built from them.\n"
-           "Input also can be piped into the program, e.g.,\n"
-           "  cat abc.in | build-icm xyz.icm\n"
-           "If <output-file> is \"-\", then output goes to standard output\n"
+           "Trims reads in a fastq file.\n"
            "\n"
-           "Options:\n"
-           " -d <num>\n"
-           "    Set depth of model to <num>\n"
-           " -F\n"
-           "    Ignore input strings with in-frame stop codons\n"
-           " -h\n"
-           "    Print this message\n"
-           " -p <num>\n"
-           "    Set period of model to <num>\n"
-           " -r\n"
-           "    Use the reverse of input strings to build the model\n"
-           " -t\n"
-           "    Output model as text (for debugging only)\n"
-           " -v <num>\n"
-           "    Set verbose level; higher is more diagnostic printouts\n"
-           " -w <num>\n"
-           "    Set length of model window to <num>\n"
+	   "Options:\n"
+	   " -r <file>\n"
+	   "    Fastq file of reads to trim\n"
+	   " -p <num>\n"
+	   "    Use <num> openMP threads\n"
+	   " -t <num>=30\n"
+	   "    Return only reads trimmed to >= <num> bp\n"
+	   " -q <num>=3\n"
+	   "    Use BWA trim parameter <num>\n"
+	   " -I\n"
+	   "    Use 64 scale Illumina quality values (else base 33)\n"
            "\n");
 
    return;
@@ -85,10 +74,6 @@ static void parse_command_line(int argc, char **argv) {
     switch(ch) {
     case 'r':
       fastqf = strdup(optarg);
-      break;
-
-    case 'o':
-      outf = strdup(optarg);
       break;
 
     case 'q':
@@ -119,6 +104,10 @@ static void parse_command_line(int argc, char **argv) {
       }
       break;
 
+    case 'h':
+      Usage(argv[0]);
+      exit(EXIT_FAILURE);
+
     case  '?' :
       fprintf (stderr, "Unrecognized option -%c\n", optopt);
 
@@ -137,6 +126,14 @@ static void parse_command_line(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
   */
+
+  ////////////////////////////////////////
+  // correct user input errors
+  ////////////////////////////////////////
+  if(fastqf == NULL) {
+    cerr << "Must provide a fastq file of reads with -r" << endl;
+    exit(EXIT_FAILURE);
+  }
 }
 
 ////////////////////////////////////////////////////////////
@@ -179,20 +176,57 @@ void pa_params(vector<streampos> & starts, vector<streampos> & counts) {
   }
 }
 
+
+////////////////////////////////////////////////////////////
+// combine_output
+//
+// Combine output files into one.
+////////////////////////////////////////////////////////////
+static void combine_output(const char* outf) {
+  ofstream combine_out(outf);
+  char strt[10];
+  char toutf[50];
+  string line;
+  struct stat st_file_info;
+  
+  for(int t = 0; t < threads; t++) {
+    strcpy(toutf, outf);
+    sprintf(strt,"%d",t);
+    strcat(toutf, strt);
+
+    // if file exists, add to single output
+    if(stat(toutf, &st_file_info) == 0) {
+      ifstream thread_out(toutf);
+      while(getline(thread_out, line))
+	combine_out << line << endl;
+      thread_out.close();
+      
+      remove(toutf);
+    }
+  }
+}
+
 ////////////////////////////////////////////////////////////
 // trim_reads
 ////////////////////////////////////////////////////////////
 static void trim_reads(vector<streampos> & starts, vector<streampos> & counts) {
+  //format output file
+  string fqf_str(fastqf);
+  int suffix_index = fqf_str.rfind(".");
+  string prefix = fqf_str.substr(0, suffix_index);
+  string suffix = fqf_str.substr(suffix_index, fqf_str.size()-suffix_index);
+  string outf = prefix + string(".trim") + suffix;
+
 #pragma omp parallel //shared(trusted)
   {
     int tid = omp_get_thread_num();
 
     // output
-    char* toutf = strdup(outf);
-    char strtid[10];
-    sprintf(strtid,"%d",tid);
-    strcat(toutf, strtid);
-    ofstream reads_out(toutf);
+    string toutf(outf);
+    stringstream tconvert;
+    tconvert << tid;
+    toutf += tconvert.str();
+    ofstream reads_out(toutf.c_str());
 
     // input
     ifstream reads_in(fastqf);
@@ -238,7 +272,10 @@ static void trim_reads(vector<streampos> & starts, vector<streampos> & counts) {
       delete r;
     }
     reads_in.close();
+    reads_out.close();
   }
+
+  combine_output(outf.c_str());
 }
 
 ////////////////////////////////////////////////////////////
