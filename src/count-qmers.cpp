@@ -161,7 +161,7 @@ int  main (int argc, char * argv [])
 
   PrintMers(mer_table, min_count);
 
-  return 1;
+  return 0;
 }
 
 
