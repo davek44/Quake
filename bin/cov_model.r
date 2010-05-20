@@ -15,9 +15,15 @@
 ############################################################
 library(VGAM)
 
+# get ratio from input
+if(length(commandArgs(trailingOnly=TRUE)) > 0) {
+  ratio.goal = as.integer(commandArgs(trailingOnly=TRUE)[1])
+} else {
+  ratio.goal = 1000
+}
+
 outf = "cutoff.txt"
 max.copy = 30
-
 
 ############################################################
 # est.cov
@@ -141,8 +147,7 @@ opt = optim(init, function(x) model(x)$like, method="BFGS", control=list(trace=1
 cat('value:',opt$value,"\n")
 p=display.params(opt$par, F)
 
-like.ratio.t = 1000
-cut = min((1:40)[cutoffs(p) < like.ratio.t])
+cut = min((1:40)[cutoffs(p) < ratio.goal])
 cat(cut,"\n", file=outf)
 
 display.params(opt$par, T)

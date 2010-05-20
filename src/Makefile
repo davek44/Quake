@@ -1,13 +1,13 @@
 CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
 CFLAGS=-O3 -fopenmp
 CPPUNIT_PATH = /fs/sz-user-supported/Linux-x86_64
-
+EXE_FILES = correct count-kmers count-qmers reduce-kmers reduce-qmers trim build_bithash correct_stats
 .PHONY: all clean
 
-all: correct count-kmers count-qmers trim build_bithash correct_stats
+all: $(EXE_FILES)
 
 clean:
-	-rm correct trim correct_stats build_bithash test *.o
+	-rm $(EXE_FILES) *.o
 
 correct: correct.cpp Read.o bithash.o
 	$(CC) $(CFLAGS) correct.cpp Read.o bithash.o -o correct
@@ -17,6 +17,12 @@ count-kmers: count-kmers.cpp count.o
 
 count-qmers: count-qmers.cpp count.o
 	$(CC) $(CFLAGS) count-qmers.cpp count.o -o count-qmers
+
+reduce-kmers: reduce-kmers.cpp
+	$(CC) $(CFLAGS) reduce-kmers.cpp -o reduce-kmers
+
+reduce-qmers: reduce-qmers.cpp
+	$(CC) $(CFLAGS) reduce-qmers.cpp -o reduce-qmers
 
 trim: trim.cpp Read.o bithash.o
 	$(CC) $(CFLAGS) trim.cpp Read.o bithash.o -o trim
