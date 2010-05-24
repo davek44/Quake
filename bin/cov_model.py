@@ -70,22 +70,29 @@ def model_cutoff(ctsf, ratio):
 # Sample kmers to give to R to learn the cutoff
 ############################################################
 def model_q_cutoff(ctsf, sample, ratio):
-    # input coverages
-    covs = []
+    # count number of kmer coverages
+    num_covs = 0
     for line in open(ctsf):
-        (kmer,cov) = line.split()
-        covs.append(cov)
+        num_covs += 1
 
-    # sample covs
-    if sample >= len(covs):
-        rand_covs = covs
+    # choose random kmer coverages
+    if sample >= num_covs:
+        rand_covs = range(num_covs)
     else:
-        rand_covs = random.sample(covs, sample)
+        rand_covs = random.sample(xrange(num_covs), sample)
+    rand_covs.sort()
 
     # print to file
     out = open('kmers.txt', 'w')
-    for rc in rand_covs:
-        print >> out, rc
+    kmer_i = 0
+    rand_i = 0
+    for line in open(ctsf):
+        if kmer_i == rand_covs[rand_i]:
+            print >> out, line.split()[1]
+            rand_i += 1
+            if rand_i >= sample:
+                break
+        kmer_i += 1
     out.close()
 
     os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,r_dir))

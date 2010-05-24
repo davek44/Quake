@@ -282,7 +282,7 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
       // quality
       getline(reads_in, toss);
       
-      if(++s == counts[t] && s != N) {
+      if(++s == counts[t] && t < counts.size()-1) {
 	starts.push_back(reads_in.tellg());
 	s = 0;
 	t++;
@@ -306,7 +306,7 @@ static void combine_output(const char* outf) {
   string line;
   struct stat st_file_info;
   
-  for(int t = 0; t < threads; t++) {
+  for(int t = 0; t < threads*chunks_per_thread; t++) {
     strcpy(toutf, outf);
     sprintf(strt,"%d",t);
     strcat(toutf, strt);
@@ -520,13 +520,6 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
   {
     int tid = omp_get_thread_num();
     
-    // output
-    string toutf(outf);
-    stringstream tconvert;
-    tconvert << tid;
-    toutf += tconvert.str();
-    ofstream reads_out(toutf.c_str());
-
     // input
     ifstream reads_in(fqf.c_str());
     
@@ -535,11 +528,18 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
     char* nti;
     Read *r;
 
-    while(chunk < starts.size()) {
-      #pragma omp critical
-      tchunk = chunk++;
+    #pragma omp critical
+    tchunk = chunk++;
 
+    while(tchunk < starts.size()) {
       reads_in.seekg(starts[tchunk]);
+
+      // output
+      string toutf(outf);
+      stringstream tconvert;
+      tconvert << tchunk;
+      toutf += tconvert.str();
+      ofstream reads_out(toutf.c_str());
 
       unsigned long long tcount = 0;
       while(getline(reads_in, header)) {
@@ -595,9 +595,13 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
 	if(++tcount == counts[tchunk])
 	  break;
       }
+      reads_out.close();
+
+      #pragma omp critical
+      tchunk = chunk++;
     }
     reads_in.close();
-    reads_out.close();
+
   }
   
   combine_output(outf.c_str());
