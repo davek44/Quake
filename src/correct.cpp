@@ -84,7 +84,8 @@ static void  Usage
            " -r <file>\n"
 	   "    Fastq file of reads\n"
 	   " -f <file>\n"
-	   "    File containing fastq file names, one per line\n"
+	   "    File containing fastq file names, one per line or\n"
+	   "    or two per line for paired end reads.\n"
 	   " -m <file>\n"
 	   "    File containing kmer counts in format `seq\tcount`.\n"
 	   "    Can also be piped in with '-'\n"
@@ -294,13 +295,46 @@ void pa_params(string fqf, vector<streampos> & starts, vector<unsigned long long
   }
 }
 
-////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // combine_output
 //
-// Combine output files into one.
-////////////////////////////////////////////////////////////
-static void combine_output(const char* outf) {
-  ofstream combine_out(outf);
+// Combine output files in 'out_dir' into a single file and remove 'out_dir'
+////////////////////////////////////////////////////////////////////////////////
+static void combine_output(string fqf) {  
+  // format output file
+  int suffix_index = fqf.rfind(".");
+  string prefix = fqf.substr(0,suffix_index);
+  string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
+  string outf = prefix + string(".cor") + suffix;
+  ofstream combine_out(outf.c_str());
+
+  // format output directory
+  string out_dir("."+fqf+"/"); 
+
+  string line;
+  struct stat st_file_info;
+  for(int t = 0; t < threads*chunks_per_thread; t++) {
+    string tc_file(out_dir+"/");
+    stringstream tc_convert;
+    tc_convert << t;
+    tc_file += tc_convert.str();
+
+    // if file exists, add to single output
+    if(stat(tc_file.c_str(), &st_file_info) == 0) {
+      ifstream tc_out(tc_file.c_str());
+      while(getline(tc_out, line))
+	combine_out << line << endl;
+      tc_out.close();
+      remove(tc_file.c_str());
+    }
+  }
+
+  // remove output directory
+  rmdir(out_dir.c_str());
+
+  combine_out.close();
+
+  /*
   char strt[10];
   char toutf[50];
   string line;
@@ -321,40 +355,105 @@ static void combine_output(const char* outf) {
       remove(toutf);
     }
   }
-
-  /*
-  char mycmd[30000];
-
-  // cat thread output
-  strcpy(mycmd, "cat ");  
-  char strt[10];
-  for(int t = 0; t < threads; t++) {
-    strcat(mycmd, outf);
-    sprintf(strt,"%d",t);
-    strcat(mycmd, strt);
-    strcat(mycmd, " ");
-  }
-  // into single file
-  strcat(mycmd, "> ");
-  strcat(mycmd, outf);
-    
-  // rm thread output
-  strcat(mycmd, "; rm ");
-  for(int t = 0; t < threads; t++) {
-    strcat(mycmd, outf);
-    sprintf(strt,"%d",t);
-    strcat(mycmd, strt);
-    strcat(mycmd, " ");
-  }
-
-  if(!final)
-    // run in background
-    strcat(mycmd, "&");
-
-  // execute
-  cout << mycmd << endl;
-  system(mycmd);
   */
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// combine_output_paired
+//
+// Combine output files in 'out_dir' into a single file and remove 'out_dir'
+////////////////////////////////////////////////////////////////////////////////
+static void combine_output_paired(string fqf1, string fqf2) {
+  // format output pair file1
+  int suffix_index = fqf1.rfind(".");
+  string prefix = fqf1.substr(0,suffix_index);
+  string suffix = fqf1.substr(suffix_index, fqf1.size()-suffix_index);
+  string outf = prefix + ".cor" + suffix;
+  ofstream pair_out1(outf.c_str());
+  // and single file1
+  outf = prefix + ".cor.single" + suffix;
+  ofstream single_out1(outf.c_str());
+
+  // format output pair file2
+  suffix_index = fqf2.rfind(".");
+  prefix = fqf2.substr(0,suffix_index);
+  suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
+  outf = prefix + ".cor" + suffix;
+  ofstream pair_out2(outf.c_str());
+  // and single file2
+  outf = prefix + ".cor.single" + suffix;
+  ofstream single_out2(outf.c_str());
+
+  // format output directories
+  string out_dir1("."+fqf1+"/");
+  string out_dir2("."+fqf2+"/");
+
+  string header1, seq1, mid1, qual1, header2, seq2, mid2, qual2;
+  struct stat st_file_info;
+  for(int t = 0; t < threads*chunks_per_thread; t++) {
+    // format thread-chunk output files
+    string tc_file1(out_dir1+"/");
+    stringstream tc_convert1;
+    tc_convert1 << t;
+    tc_file1 += tc_convert1.str();
+
+    string tc_file2(out_dir2+"/");
+    stringstream tc_convert2;
+    tc_convert2 << t;
+    tc_file2 += tc_convert2.str();
+
+    // if file exists, both must
+    if(stat(tc_file1.c_str(), &st_file_info) == 0) {
+      ifstream tc_out1(tc_file1.c_str());
+      ifstream tc_out2(tc_file2.c_str());
+     
+      while(getline(tc_out1, header1)) {
+	// get read1
+	getline(tc_out1, seq1);
+	getline(tc_out1, mid1);
+	getline(tc_out1, qual1);
+
+	// get read2
+	if(!getline(tc_out2, header2)) {
+	  cerr << "Uneven number of reads in paired end read files " << fqf1 << " and " << fqf2 << endl;
+	  exit(EXIT_FAILURE);
+	}	
+	getline(tc_out2, seq2);
+	getline(tc_out2, mid2);
+	getline(tc_out2, qual2);
+
+	if(header1.find("error") == -1) {
+	  if(header2.find("error") == -1) {
+	    // no errors
+	    pair_out1 << header1 << endl << seq1 << endl << mid1 << endl << qual1 << endl;
+	    pair_out2 << header2 << endl << seq2 << endl << mid2 << endl << qual2 << endl;
+	  } else {
+	    // error in 2	    
+	    single_out1 << header1 << endl << seq1 << endl << mid1 << endl << qual1 << endl;
+	  }
+	} else {
+	  if(header2.find("error") == -1) {
+	    // error in 1
+	    single_out2 << header2 << endl << seq2 << endl << mid2 << endl << qual2 << endl;
+	  }
+	}
+      }
+      tc_out1.close();
+      tc_out2.close();
+      remove(tc_file1.c_str());
+      remove(tc_file2.c_str());
+    }
+  }
+
+  // remove output directory
+  rmdir(out_dir1.c_str());
+  rmdir(out_dir2.c_str());
+
+  pair_out1.close();
+  pair_out2.close();
+  single_out1.close();
+  single_out2.close();
 }
 
 
@@ -448,13 +547,13 @@ void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max
 }
 
 
-////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // output_read
 //
 // Output the given possibly corrected and/or trimmed
 // read according to the given options.
-////////////////////////////////////////////////////////////
-static void output_read(ofstream & reads_out, string header, string ntseq, string mid, string strqual, string corseq) {
+////////////////////////////////////////////////////////////////////////////////
+static void output_read(ofstream & reads_out, int pe_code, string header, string ntseq, string mid, string strqual, string corseq) {
   if(corseq.size() >= trim_t) {
     // check for changes
     bool corrected = false;
@@ -487,9 +586,9 @@ static void output_read(ofstream & reads_out, string header, string ntseq, strin
     if(TESTING)
       cerr << header << "\t" << ntseq << "\t" << corseq << endl;
   } else {
-    if(uncorrected_out) {
+    if(uncorrected_out || pe_code > 0) {
       // update header
-      if(!orig_headers)
+      if(!orig_headers || pe_code > 0)
 	header += " error";
       //print
       if(contrail_out)
@@ -503,17 +602,21 @@ static void output_read(ofstream & reads_out, string header, string ntseq, strin
 }
 
 
-////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // correct_reads
-////////////////////////////////////////////////////////////
-//static void correct_reads(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
-static void correct_reads(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
-  // format output file
-  int suffix_index = fqf.rfind(".");
-  string prefix = fqf.substr(0,suffix_index);
-  string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
-  string outf = prefix + string(".cor") + suffix;
-  //cout << outf << endl;
+//
+// Correct the reads in the file 'fqf' using the data structure of trusted
+// kmers 'trusted', matrix of nt->nt error rates 'ntnt_prob' and prior nt
+// probabilities 'prior_prob'.  'starts' and 'counts' help openMP parallelize
+// the read processing.  If 'pairedend_code' is 0, the reads are not paired;
+// if it's 1, this file is the first of a pair so print all reads and withold
+// combining; if it's 2, the file is the second of a pair so print all reads
+// and then combine both 1 and 2.
+////////////////////////////////////////////////////////////////////////////////
+static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
+  // output directory
+  string out_dir("."+fqf);
+  mkdir(out_dir.c_str(), S_IRWXU);
 
   unsigned int chunk = 0;
 #pragma omp parallel //shared(trusted)
@@ -535,7 +638,7 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
       reads_in.seekg(starts[tchunk]);
 
       // output
-      string toutf(outf);
+      string toutf(out_dir+"/");
       stringstream tconvert;
       tconvert << tchunk;
       toutf += tconvert.str();
@@ -581,7 +684,7 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
 	    corseq = r->correct(trusted, ntnt_prob, prior_prob);
 
 	  // output read w/ trim and corrections
-	  output_read(reads_out, header, ntseq, mid, strqual, corseq);
+	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, corseq);
 	  
 	  delete r;
 	} else {
@@ -601,10 +704,10 @@ static void correct_reads(string fqf, bithash * trusted, vector<streampos> & sta
       tchunk = chunk++;
     }
     reads_in.close();
-
   }
-  
-  combine_output(outf.c_str());
+
+  if(pe_code == 0)
+    combine_output(fqf);
 }
 
 
@@ -754,7 +857,6 @@ vector<double> load_AT_cutoffs() {
 void unzip_fastq(const char* fqf) {
   char mycmd[100];
 
-  // zcat to cwd
   strcpy(mycmd, "zcat ");
   strcat(mycmd, zipd);
   strcat(mycmd, "/");
@@ -762,21 +864,6 @@ void unzip_fastq(const char* fqf) {
   strcat(mycmd, " > ");
   strncat(mycmd, fqf, strstr(fqf, ".gz") - fqf);
   system(mycmd);
-
-  /*
-  // cp to cwd
-  strcpy(mycmd, "cp ");
-  strcat(mycmd, zipd);
-  strcat(mycmd, "/");
-  strcat(mycmd, fqf);
-  strcat(mycmd, " .");
-  system(mycmd);
-
-  // gunzip
-  strcpy(mycmd, "gunzip ");
-  strcat(mycmd, fqf);
-  system(mycmd);
-  */
 }
 
 ////////////////////////////////////////////////////////////
@@ -813,19 +900,88 @@ void zip_fastq(const char* fqf) {
   system(mycmd);
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+// split
+//
+// Split on whitespace
+////////////////////////////////////////////////////////////////////////////////
+vector<string> split(string s) {
+  vector<string> splits;
+  int split_num = 0;
+  bool last_space = true;
+
+  for(int i = 0; i < s.size(); i++) {
+    if(s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r') {
+      if(!last_space)
+	split_num++;
+      last_space = true;
+    } else {
+      if(split_num == splits.size())
+	splits.push_back("");
+      splits[split_num] += s[i];
+      last_space = false;
+    }
+  }
+
+  return splits;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// parse_fastq
+//
+// Accept a single fastq file from input, or parse a file with names of fastq
+// files.  For multiple files, attached a paired end code to tell the correction
+// method how to handle the file.
+////////////////////////////////////////////////////////////////////////////////
+vector<string> parse_fastq(vector<string> & fastqfs, vector<int> & pairedend_codes) {
+  if(file_of_fastqf != NULL) {
+    ifstream ff(file_of_fastqf);
+    vector<string> next_fastqf;
+    string line;
+
+    while(getline(ff, line) && line.size() > 0) {
+      next_fastqf = split(line);
+
+      if(next_fastqf.size() == 1) {
+	fastqfs.push_back(next_fastqf[0]);
+	pairedend_codes.push_back(0);
+
+      } else if(next_fastqf.size() == 2) {
+	fastqfs.push_back(next_fastqf[0]);
+	fastqfs.push_back(next_fastqf[1]);
+	pairedend_codes.push_back(1);
+	pairedend_codes.push_back(2);
+
+      } else {
+	cerr << "File of fastq file names must have a single fastq file per line for single reads or two fastqf files per line separated by a space for paired end reads " << endl;
+	exit(EXIT_FAILURE);
+      }
+    }
+
+  } else {
+    fastqfs.push_back(string(fastqf));
+    pairedend_codes.push_back(0);
+  }
+
+  return fastqfs;
+}
+
+
 ////////////////////////////////////////////////////////////
 // main
 ////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
-  // count AT's and GC's
+  // prepare AT and GC counts
   unsigned long long atgc[2] = {0};
 
   // make trusted kmer data structure
   bithash *trusted = new bithash();
 
-  // kmer counts
+  // get kmer counts
   if(merf != NULL) {
     if(ATcutf != NULL) {
       if(strcmp(merf,"-") == 0)
@@ -850,8 +1006,7 @@ int main(int argc, char **argv) {
       exit(EXIT_FAILURE);
     } else
       trusted->binary_file_input(bithashf, atgc);
-  }
-  
+  }  
   cout << trusted->num_kmers() << " trusted kmers" << endl;
 
   double prior_prob[4];
@@ -860,26 +1015,21 @@ int main(int argc, char **argv) {
   prior_prob[2] = prior_prob[1];
   prior_prob[3] = prior_prob[0];
   
-  cout << "AT: " << atgc[0] << " GC: " << atgc[1] << endl;
+  //cout << "AT: " << atgc[0] << " GC: " << atgc[1] << endl;
   cout << "AT% = " << (2*prior_prob[0]) << endl;
 
   // make list of files
   vector<string> fastqfs;
-  if(file_of_fastqf != NULL) {
-    ifstream ff(file_of_fastqf);
-    string next_fastqf;
+  vector<int> pairedend_codes;
+  parse_fastq(fastqfs, pairedend_codes);
 
-    while(getline(ff, next_fastqf) && next_fastqf.size() > 0)
-      fastqfs.push_back(next_fastqf);
-  } else
-    fastqfs.push_back(string(fastqf));
-
-  // process each
+  // process each file
   string fqf;
   for(int f = 0; f < fastqfs.size(); f++) {
     fqf = fastqfs[f];
     cout << fqf << endl;
 
+    // unzip
     if(zipd != NULL) {
       unzip_fastq(fqf.c_str());
       fqf = fqf.substr(0, fqf.size()-3);
@@ -900,8 +1050,14 @@ int main(int argc, char **argv) {
 
     learn_errors(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
 
-    correct_reads(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
+    // correct
+    correct_reads(fqf, pairedend_codes[f], trusted, starts, counts, ntnt_prob, prior_prob);
+    
+    // combine paired end
+    if(pairedend_codes[f] == 2)
+      combine_output_paired(fastqfs[f-1], fqf);
 
+    // zip
     if(zipd != NULL)
       zip_fastq(fqf.c_str());
   }
