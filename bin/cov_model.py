@@ -15,10 +15,11 @@ r_dir = '/nfshomes/dakelley/research/error_correction/bin'
 # main
 ############################################################
 def main():
-    parser = OptionParser()
-    parser.add_option('--int', dest='counted_qmers', action='store_false', default=True, help='Kmers were counted as integers w/o the use of quality values')
-    parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help='Model kmer coverage as a function of GC content of kmers')
-    parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff')
+    usage = 'usage: %prog [options] <counts file>'
+    parser = OptionParser(usage)
+    parser.add_option('--int', dest='counted_kmers', action='store_true', default=False, help='Kmers were counted as integers w/o the use of quality values [default: %default]')
+    parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help='Model kmer coverage as a function of GC content of kmers [default: %default]')
+    parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff [default: %default]')
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
@@ -26,15 +27,16 @@ def main():
     else:
         ctsf = args[0]
 
-    if options.counted_qmers:
+    if options.counted_kmers:
+        model_cutoff(ctsf, options.ratio)
+        print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
+        
+    else:
         if options.model_gc:
             model_q_gc_cutoffs(ctsf, 10000, options.ratio)
         else:
             model_q_cutoff(ctsf, 25000, options.ratio)
             print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
-    else:
-        model_cutoff(ctsf, options.ratio)
-        print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
 
 
 ############################################################
