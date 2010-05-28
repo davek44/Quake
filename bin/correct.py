@@ -66,7 +66,8 @@ def main():
         cutoff = open('cutoff.txt').readline().rstrip()
 
         # run correct C++ code
-        os.system('correct -r %s -m %s -c %s -p %d %s' % (options.readsf, ctsf, cutoff, options.proc, options.illumina_qual))
+        # !!TMP!!
+        os.system('correct -r %s -m %s -c %s -p %d %s 2> stats.txt' % (options.readsf, ctsf, cutoff, options.proc, options.illumina_qual))
 
 
 ############################################################

@@ -147,8 +147,6 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
   ////////////////////////////////////////
   // region
   ////////////////////////////////////////
-  // determine region to consider
-  //vector<short> region = error_region(untrusted_subset);
   // sort by quality
   if(region.size() > 0)
     quality_quicksort(region, 0, region.size()-1);
@@ -196,13 +194,19 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
     //cerr << header << "\t" << region.size() << "\t" << untrusted_subset.size() << "\t" << nt90 << "\t" << nt99 << "\t" << exp_errors << "\t0\t0\t0\t0" << endl;
     return false;
 
-  } else if(nt99 >= 11) {
+  } else if(nt99 >= 11) {  
     // proceed very cautiously
-    mylike_t = .1;
+    if(aggressive)
+      mylike_t = .05;
+    else
+      mylike_t = .1;
 
   } else if(nt99 >= 9) {
     //proceed cautiously
-    mylike_t = .03;
+    if(aggressive)
+      mylike_t = .001;
+    else
+      mylike_t = .03;
   }
 
   ////////////////////////////////////////
@@ -409,6 +413,7 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
     if(TESTING && mylike_t > correct_min_t)
       cerr << header << "\t" << print_seq() << "\t." << endl;
     //cerr << header << "\t" << region.size() << "\t" << untrusted_subset.size() << "\t" << nt90 << "\t" << nt99 << "\t" << exp_errors << "\t" << cpq_adds << "\t" << check_count << "\t0\t0" << endl;
+
     return false;
   }
 }
@@ -492,8 +497,7 @@ string Read::correct(bithash *trusted, double ntnt_prob[][4][4], double prior_pr
 
       // try bigger error region
       big_region = error_region(cc_untrusted[cc]);
-      if(chop_region.size() == big_region.size() || !correct_cc(big_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {
-	
+      if(chop_region.size() == big_region.size() || !correct_cc(big_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {	
 	// cannot correct, but trim
 	// Note: In some cases, we'll overtrim here, but given that we couldn't
 	//       correct, we have to assume there's chaos and be conservative
@@ -574,6 +578,15 @@ vector<short> Read::error_region_chop(vector<int> untrusted_subset) {
 	region.push_back(front_chop[i]);
     }
 
+    // add back 1 base if it's low quality, or lower quality than the next base
+    for(int er = 0; er < expand_region; er++) {
+      int pre_region = region[0] - (er+1);
+      if(pre_region >= 0 && (prob[pre_region] < .99 || prob[pre_region] <= prob[pre_region+1])) {
+	vector<short>::iterator it;
+	it = region.begin();
+	region.insert(it, pre_region);
+      }
+    }
   } else {
     // extend to front
     for(int i = region[0]-1; i >= 0; i--)
@@ -590,6 +603,20 @@ vector<short> Read::error_region_chop(vector<int> untrusted_subset) {
       if(back_chop[i] < left_rightkmer)
 	region.push_back(back_chop[i]);
     }
+
+    // add back 1 base if it's low quality, or lower quality than the next base
+    // Two issues with this:
+    // 1. I think region could be empty, so there's a bug
+    // 2. This won't help for errors in the middle of a read that are missing an untrusted kmer
+    //    because the region will be empty, and we'll just try the intersection.
+    /*
+    for(int er = 0; er < expand_region; er++) {
+      int post_region = region.back() + (er+1);
+      if(post_region < trim_length && (prob[post_region] < .99 || prob[post_region] <= prob[post_region-1])) {
+	region.push_back(post_region);
+      }
+    }
+    */
 
   } else {
     // extend to back

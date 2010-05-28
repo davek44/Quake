@@ -76,17 +76,12 @@ class Read {
   ~Read();
 
   string trim(int t);
-  //bool trim(int t, ofstream & out);
-  //string correct(bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning = false);
   string correct(bithash *trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning = false);
-  //bool single_correct(bithash* trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning = false);
-  //bool correct_cc(vector<short>, vector<int> untrusted_subset, bithash* trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning);
   bool correct_cc(vector<short>, vector<int> untrusted_subset, bithash* trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning);
   vector<short> error_region(vector<int> untrusted_subset);
   vector<short> error_region_chop(vector<int> untrusted_subset);
   bool check_trust(corrected_read *cr, bithash *trusted, unsigned int & check_count);
   string print_seq();
-  //string print_corrected(corrected_read* cr);
   string print_corrected(vector<correction> & cor);
   string print_corrected(vector<correction> & cor, int print_nt);
 
@@ -111,6 +106,9 @@ class Read {
   void quality_quicksort(vector<short> & indexes, int left, int right);
 
   float global_like;  // to track likelihood across components
+
+  const static bool aggressive = true;
+  const static short expand_region = 1;
 };
 
 #endif

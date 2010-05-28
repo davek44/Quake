@@ -149,7 +149,9 @@ bool Fastq_Read(FILE * fp, string & s, string & hdr, string & q)
       q . push_back (char (ch));
   }
   
-  if  (ch == '@')
+  if(ch == EOF)
+    return false;
+  else if(ch == '@')
     ungetc (ch, fp);
   
   return  true;
