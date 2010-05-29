@@ -227,7 +227,7 @@ static void  CountMers (const string & s, const string & q, MerTable_t & mer_tab
      else if(non_acgt_buffer > 0)
        non_acgt_buffer--;
 
-     if(non_acgt_buffer == 0) {
+     if(non_acgt_buffer == 0 && quality > .0001) {
        string f,r;
 
        MerToAscii(fwd_mer, f);
