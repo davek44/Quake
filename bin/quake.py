@@ -4,9 +4,10 @@ import os, random
 import cov_model
 
 ############################################################
-# correct.py
+# quake.py
 #
-# Launch pipeline to correct errors in sequencing reads.
+# Launch pipeline to correct errors in Illumina sequencing
+# reads.
 ############################################################
 
 r_dir = '/nfshomes/dakelley/research/error_correction/bin'
@@ -21,11 +22,11 @@ def main():
     parser.add_option('-k', dest='k', type='int', help='Size of k-mers to correct')
     parser.add_option('-p', dest='proc', type='int', default=4, help='Number of processes [default: %default]')
     parser.add_option('-I', dest='illumina_qual', action='store_true', default=False, help='Interpret quality values as Illumina base 64 (as opposed to 33) [default: %default]')
-    parser.add_option('--no_count', dest='no_count', action='store_true', default=False, help='Kmers are already counted and in expected file [default: %default]')
-    parser.add_option('--no_cut', dest='no_cut', action='store_true', default=False, help='Coverage model is optimized and cutoff was printed to expected file [default: %default]')
+    parser.add_option('--no_count', dest='no_count', action='store_true', default=False, help='Kmers are already counted and in expected file [reads file].qcts or [reads file].cts [default: %default]')
+    parser.add_option('--no_cut', dest='no_cut', action='store_true', default=False, help='Coverage model is optimized and cutoff was printed to expected file cutoff.txt [default: %default]')
     parser.add_option('--int', dest='counted_kmers', action='store_true', default=False, help='Kmers were counted as integers w/o the use of quality values [default: %default]')
-    parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help='Model kmer coverage as a function of GC content of kmers [default: %default]')
-    parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff [default: %default]')
+    parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help='IGNORE: Model kmer coverage as a function of GC content of kmers [default: %default]')
+    parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff.  Generally set between 10-1000 with lower numbers suggesting a lower threshold. [default: %default]')
     (options, args) = parser.parse_args()
 
     if not options.readsf:
@@ -66,8 +67,7 @@ def main():
         cutoff = open('cutoff.txt').readline().rstrip()
 
         # run correct C++ code
-        # !!TMP!!
-        os.system('correct -r %s -m %s -c %s -p %d %s 2> stats.txt' % (options.readsf, ctsf, cutoff, options.proc, options.illumina_qual))
+        os.system('correct -r %s -m %s -c %s -p %d %s' % (options.readsf, ctsf, cutoff, options.proc, options.illumina_qual))
 
 
 ############################################################
