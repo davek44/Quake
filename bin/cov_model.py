@@ -20,6 +20,7 @@ def main():
     parser.add_option('--int', dest='counted_kmers', action='store_true', default=False, help='Kmers were counted as integers w/o the use of quality values [default: %default]')
     parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help='Model kmer coverage as a function of GC content of kmers [default: %default]')
     parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff [default: %default]')
+    parser.add_option('--no_sample', dest='no_sample', action='store_true', default=False, help='Do not sample kmer coverages into kmers.txt because its already done [default: %default]')
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
@@ -35,7 +36,7 @@ def main():
         if options.model_gc:
             model_q_gc_cutoffs(ctsf, 10000, options.ratio)
         else:
-            model_q_cutoff(ctsf, 25000, options.ratio)
+            model_q_cutoff(ctsf, 25000, options.ratio, options.no_sample)
             print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
 
 
@@ -71,31 +72,32 @@ def model_cutoff(ctsf, ratio):
 #
 # Sample kmers to give to R to learn the cutoff
 ############################################################
-def model_q_cutoff(ctsf, sample, ratio):
-    # count number of kmer coverages
-    num_covs = 0
-    for line in open(ctsf):
-        num_covs += 1
+def model_q_cutoff(ctsf, sample, ratio, no_sample=False):
+    if not no_sample:
+        # count number of kmer coverages
+        num_covs = 0
+        for line in open(ctsf):
+            num_covs += 1
 
-    # choose random kmer coverages
-    if sample >= num_covs:
-        rand_covs = range(num_covs)
-    else:
-        rand_covs = random.sample(xrange(num_covs), sample)
-    rand_covs.sort()
+        # choose random kmer coverages
+        if sample >= num_covs:
+            rand_covs = range(num_covs)
+        else:
+            rand_covs = random.sample(xrange(num_covs), sample)
+        rand_covs.sort()
 
-    # print to file
-    out = open('kmers.txt', 'w')
-    kmer_i = 0
-    rand_i = 0
-    for line in open(ctsf):
-        if kmer_i == rand_covs[rand_i]:
-            print >> out, line.split()[1]
-            rand_i += 1
-            if rand_i >= sample:
-                break
-        kmer_i += 1
-    out.close()
+        # print to file
+        out = open('kmers.txt', 'w')
+        kmer_i = 0
+        rand_i = 0
+        for line in open(ctsf):
+            if kmer_i == rand_covs[rand_i]:
+                print >> out, line.split()[1]
+                rand_i += 1
+                if rand_i >= sample:
+                    break
+            kmer_i += 1
+        out.close()
 
     os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,r_dir))
 
