@@ -122,6 +122,7 @@ int  main (int argc, char * argv [])
   if(strcmp(fastqfile,"-") == 0)
     fp = stdin;
   else {
+    cerr << fastqfile << endl;
     fp = fopen(fastqfile, "r");
     if (!fp)
       {
