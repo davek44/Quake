@@ -10,7 +10,7 @@
 using namespace::std;
 
 //const int bitsize = 22;
-const int bitsize = 110;
+const int bitsize = 75;
 
 ////////////////////////////////////////////////////////////
 // correction
@@ -75,40 +75,38 @@ class Read {
   Read(const string & h, const unsigned int* s, const string & q, vector<int> & u, const int read_length);
   ~Read();
 
-  string trim(int t);
-  string correct(bithash *trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning = false);
-  int correct_cc(vector<short>, vector<int> untrusted_subset, bithash* trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning);
+  bool trim(int t, ofstream & out);
+  bool correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning = false);
+  bool single_correct(bithash* trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning = false);
+  bool correct_subset(vector<int> untrusted_subset, bithash* trusted, ofstream & out, double (&ntnt_prob)[4][4], bool learning);
   vector<short> error_region(vector<int> untrusted_subset);
-  vector<short> error_region_chop(vector<int> untrusted_subset);
-  bool check_trust(corrected_read *cr, bithash *trusted, unsigned int & check_count);
-  string print_seq();
-  string print_corrected(vector<correction> & cor);
-  string print_corrected(vector<correction> & cor, int print_nt);
+  bool check_trust(corrected_read *cr, bithash *trusted);
 
 
   string header;
   int read_length;
   int trim_length;
   unsigned int* seq;
-  unsigned int* quals;
   float* prob;
   vector<int> untrusted;
   corrected_read *trusted_read;
 
   const static float trust_spread_t = .1;
-  const static float correct_min_t = .000001;
-  const static float learning_min_t = .00001;
+  const static float correct_min_t = .00001;
+  const static float learning_min_t = .005;
+  static int trim_t;
   static bool illumina_qual;
 
  private:
   bool untrusted_intersect(vector<int> untrusted_subset, vector<short> & region);
   void untrusted_union(vector<int> untrusted_subset, vector<short> & region);
   void quality_quicksort(vector<short> & indexes, int left, int right);
+  string print_seq();
+  //string print_corrected(corrected_read* cr);
+  string print_corrected(vector<correction> & cor);
+  string print_corrected(vector<correction> & cor, int print_nt);
 
-  float global_like;  // to track likelihood across components
-
-  const static bool aggressive = true;
-  const static short expand_region = 1;
+  float likelihood;
 };
 
 #endif

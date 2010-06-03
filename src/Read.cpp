@@ -127,10 +127,17 @@ bool Read::single_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[
 // but otherwise abstains.
 //
 // Corrections can be accessed through 'trusted_read'
+//
+// Return codes are:
+// 0: corrected
+// 1: ambiguous
+// 2: full queue or quit early
+// 3: empty queue or empty region
 ////////////////////////////////////////////////////////////
 //bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double (&ntnt_prob)[4][4], double prior_prob[4], bool learning) {  
-bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning) {  
+int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning) {  
 
+  unsigned int max_queue_size = 400000;
   /*
   if(header == "@4844") {
     cout << "Untrusted: " << untrusted_subset.size() << endl;
@@ -152,7 +159,7 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
     quality_quicksort(region, 0, region.size()-1);
   else
     // die quietly and try again with bigger region
-    return false;
+    return 3;
 
   ////////////////////////////////////////
   // stats
@@ -182,7 +189,7 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
   if(learning) {
     if(nt99 >= 8 || non_acgt > 1) {
       //out << header << "\t" << print_seq() << "\t." << endl;
-      return false;
+      return 2;
     }
     mylike_t = learning_min_t;
     myglobal_t = learning_min_t;
@@ -192,7 +199,7 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
     if(TESTING)
 	cerr << header << "\t" << print_seq() << "\t." << endl;
     //cerr << header << "\t" << region.size() << "\t" << untrusted_subset.size() << "\t" << nt90 << "\t" << nt99 << "\t" << exp_errors << "\t0\t0\t0\t0" << endl;
-    return false;
+    return 2;
 
   } else if(nt99 >= 11) {  
     // proceed very cautiously
@@ -264,13 +271,14 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
   trusted_read = 0;
   float trusted_likelihood;
   signed int untrusted_count;  // trust me
+  bool ambiguous_flag = false;
 
   while(cpq.size() > 0) {    
 
     /////////////////////////
     // quit if pq is too big
     /////////////////////////
-    if(cpq.size() > 400000) {
+    if(cpq.size() > max_queue_size) {
       //cout << "queue is too large for " << header << endl;
       if(TESTING)
       	cerr << header << "\t" << print_seq() << "\t." << endl;
@@ -317,11 +325,14 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
 	trusted_read = cr;
 	trusted_likelihood = cr->likelihood;
       } else {
+	// if yes, and if trusted read exists
+	ambiguous_flag = true;
+
 	// output ambiguous corrections for testing
 	if(TESTING)
 	  cerr << header << "\t" << print_seq() << "\t" << print_corrected(trusted_read->corrections) << "\t" << print_corrected(cr->corrections) << endl;
 	
-	// if yes, and if trusted read exists delete trusted_read, break loop
+	// delete trusted_read, break loop
 	delete trusted_read;
 	delete cr;
 	trusted_read = 0;
@@ -408,13 +419,18 @@ bool Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithas
   
   if(trusted_read != 0) {
     //cerr << header << "\t" << region.size() << "\t" << untrusted_subset.size() << "\t" << nt90 << "\t" << nt99 << "\t" << exp_errors << "\t" << cpq_adds << "\t" << check_count << "\t1\t" << trusted_read->likelihood << endl;
-    return true;
+    return 0;
   } else {
     if(TESTING && mylike_t > correct_min_t)
       cerr << header << "\t" << print_seq() << "\t." << endl;
     //cerr << header << "\t" << region.size() << "\t" << untrusted_subset.size() << "\t" << nt90 << "\t" << nt99 << "\t" << exp_errors << "\t" << cpq_adds << "\t" << check_count << "\t0\t0" << endl;
 
-    return false;
+    if(ambiguous_flag)
+      return 1;
+    else if(cpq.size() > max_queue_size)
+      return 2;
+    else
+      return 3;
   }
 }
 
@@ -487,23 +503,60 @@ string Read::correct(bithash *trusted, double ntnt_prob[][4][4], double prior_pr
   ////////////////////////////////////////
   // process connected components
   ////////////////////////////////////////
+  // NEW V2
+  vector<correction> multi_cors;
+  vector<short> chop_region;
+  vector<short> big_region;
+  int chop_correct_code, big_correct_code;
+  for(cc = 0; cc < cc_untrusted.size(); cc++) {
+    // try chopped error region
+    chop_region = error_region_chop(cc_untrusted[cc]);
+    chop_correct_code = correct_cc(chop_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning);
+    if(chop_correct_code > 0) {
+      // try bigger error region
+      big_region = error_region(cc_untrusted[cc]);
+      if(chop_region.size() == big_region.size()) {
+	// cannot correct, and nothing found so trim to untrusted
+	return print_corrected(multi_cors, cc_untrusted[cc].front());
+
+      } else {
+	big_correct_code = correct_cc(big_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning);
+	
+	if(big_correct_code == 1) {
+	  // ambiguous
+	  // cannot correct, but trim to region
+	  if(chop_correct_code == 1)
+	    return print_corrected(multi_cors, chop_region.front());
+	  else
+	    return print_corrected(multi_cors, big_region.front());
+
+	} else if(big_correct_code == 2 || big_correct_code == 3) {
+	  // cannot correct, and chaotic or nothing found so trim to untrusted
+	  return print_corrected(multi_cors, cc_untrusted[cc].front());
+	}
+      }
+    }
+    // else, corrected!
+
+  /*  ORIGINAL
   vector<correction> multi_cors;
   vector<short> chop_region;
   vector<short> big_region;
   for(cc = 0; cc < cc_untrusted.size(); cc++) {
     // try chopped error region
     chop_region = error_region_chop(cc_untrusted[cc]);
-    if(!correct_cc(chop_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {
+    if(correct_cc(chop_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning) != 0) {
 
       // try bigger error region
       big_region = error_region(cc_untrusted[cc]);
-      if(chop_region.size() == big_region.size() || !correct_cc(big_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning)) {	
+      if(chop_region.size() == big_region.size() || correct_cc(big_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning) != 0) {
 	// cannot correct, but trim
 	// Note: In some cases, we'll overtrim here, but given that we couldn't
-	//       correct, we have to assume there's chaos and be conservative
+	// correct, we have to assume there's chaos and be conservative	
 	return print_corrected(multi_cors, cc_untrusted[cc].front());
       }
     }
+  */
 
     // corrected
     global_like *= trusted_read->likelihood;
