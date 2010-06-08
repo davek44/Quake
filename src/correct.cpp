@@ -464,7 +464,7 @@ static void combine_output_paired(string fqf1, string fqf2) {
 // on ntnt_prob across quality values.
 ////////////////////////////////////////////////////////////
 void regress_probs(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max_qual][4][4]) {
-  double sigma = 3.0;
+  double sigma = 2.0;
   double sigma2 = pow(sigma, 2);
   
   // count # occurrences for each (quality=q,actual=a) tuple
