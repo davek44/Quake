@@ -147,10 +147,10 @@ int  main (int argc, char * argv [])
       // clear table
       mer_table.clear();
     }
-    /*if(++proc_seq == 1000000) {
+    if(++proc_seq == 1000000) {
       cerr << ".";
       proc_seq = 0;
-      }*/
+    }
   }
 
   cerr << COUNT << " sequences processed, " << LEN << " bp scanned" << endl;

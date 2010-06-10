@@ -1,5 +1,6 @@
 CC=/fs/sz-user-supported/Linux-x86_64/packages/gcc-4.2.4/bin/g++
 CFLAGS=-O3 -fopenmp
+INCLUDEDIR=/fs/szannotation/src/boost_1_42_0
 CPPUNIT_PATH = /fs/sz-user-supported/Linux-x86_64
 EXE_FILES = correct count-kmers count-qmers reduce-kmers reduce-qmers trim build_bithash correct_stats
 .PHONY: all clean

@@ -6,7 +6,9 @@
 #include <set>
 #include <queue>
 
-#define TESTING false
+#define TESTING true
+
+int bithash::k;
 
 ////////////////////////////////////////////////////////////
 // corrections_compare
@@ -89,7 +91,7 @@ string Read::trim(int t) {
 
   // update untrusted
   for(int i = untrusted.size()-1; i >= 0; i--) {
-    if(untrusted[i] > trim_length - k)
+    if(untrusted[i] > trim_length - bithash::k)
       untrusted.pop_back();
   }
 
@@ -358,7 +360,7 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
     */
     
     // if untrusted sharply increases, just bail
-    if(((signed int)cr->untrusted.count() - untrusted_count)*3 < k) {    
+    if(((signed int)cr->untrusted.count() - untrusted_count)*3 < bithash::k) {
 
       /////////////////////////
       // add next correction
@@ -493,7 +495,7 @@ string Read::correct(bithash *trusted, double ntnt_prob[][4][4], double prior_pr
 
   for(int i = 1; i < untrusted.size(); i++) {
     // if kmer from last untrusted doesn't reach next
-    if(untrusted[i-1]+k-1 < untrusted[i]) {
+    if(untrusted[i-1]+bithash::k-1 < untrusted[i]) {
       cc++;
       cc_untrusted.push_back(vector<int>());
     }
@@ -503,7 +505,6 @@ string Read::correct(bithash *trusted, double ntnt_prob[][4][4], double prior_pr
   ////////////////////////////////////////
   // process connected components
   ////////////////////////////////////////
-  // NEW V2
   vector<correction> multi_cors;
   vector<short> chop_region;
   vector<short> big_region;
@@ -537,26 +538,6 @@ string Read::correct(bithash *trusted, double ntnt_prob[][4][4], double prior_pr
       }
     }
     // else, corrected!
-
-  /*  ORIGINAL
-  vector<correction> multi_cors;
-  vector<short> chop_region;
-  vector<short> big_region;
-  for(cc = 0; cc < cc_untrusted.size(); cc++) {
-    // try chopped error region
-    chop_region = error_region_chop(cc_untrusted[cc]);
-    if(correct_cc(chop_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning) != 0) {
-
-      // try bigger error region
-      big_region = error_region(cc_untrusted[cc]);
-      if(chop_region.size() == big_region.size() || correct_cc(big_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning) != 0) {
-	// cannot correct, but trim
-	// Note: In some cases, we'll overtrim here, but given that we couldn't
-	// correct, we have to assume there's chaos and be conservative	
-	return print_corrected(multi_cors, cc_untrusted[cc].front());
-      }
-    }
-  */
 
     // corrected
     global_like *= trusted_read->likelihood;
@@ -593,12 +574,12 @@ vector<short> Read::error_region(vector<int> untrusted_subset) {
   short f = region.front();
   short b = region.back();
   
-  if(k-1 >= f) {
+  if(bithash::k-1 >= f) {
     // extend to front
     for(short i = f-1; i >= 0; i--)
       region.push_back(i);
   }
-  if(trim_length-k <= b) {
+  if(trim_length-bithash::k <= b) {
     // extend to back
     for(short i = b+1; i < trim_length; i++)
       region.push_back(i);
@@ -627,7 +608,7 @@ vector<short> Read::error_region_chop(vector<int> untrusted_subset) {
     vector<short> front_chop(region);
     region.clear();
     for(int i = 0; i < front_chop.size(); i++) {
-      if(front_chop[i] > right_leftkmer+k-1)
+      if(front_chop[i] > right_leftkmer+bithash::k-1)
 	region.push_back(front_chop[i]);
     }
 
@@ -648,7 +629,7 @@ vector<short> Read::error_region_chop(vector<int> untrusted_subset) {
 
   // fix back
   int left_rightkmer = untrusted_subset.back()+1;
-  if(left_rightkmer+k-1 < trim_length) {
+  if(left_rightkmer+bithash::k-1 < trim_length) {
     // erase all bp in leftmost right kmer
     vector<short> back_chop(region);
     region.clear();
@@ -696,10 +677,10 @@ bool Read::untrusted_intersect(vector<int> untrusted_subset, vector<short> & reg
     u = untrusted_subset[i];
 
     // if overlap
-    if(start <= u+k-1 && u <= end) {
+    if(start <= u+bithash::k-1 && u <= end) {
       // take intersection
       start = max(start, u);
-      end = min(end, u+k-1);
+      end = min(end, u+bithash::k-1);
     } else {
       // intersection is empty
       return false;   
@@ -723,7 +704,7 @@ void Read::untrusted_union(vector<int> untrusted_subset, vector<short> & region)
   for(int i = 0; i < untrusted_subset.size(); i++) {
     u = untrusted_subset[i];
 
-    for(short ui = u; ui < u+k; ui++)
+    for(short ui = u; ui < u+bithash::k; ui++)
       region_set.insert(ui);
   }
 
@@ -786,14 +767,14 @@ bool Read::check_trust(corrected_read *cr, bithash *trusted, unsigned int & chec
   }
 
   int edit = cr->corrections.back().index;
-  int kmer_start = max(0, edit-k+1);
+  int kmer_start = max(0, edit-bithash::k+1);
   //int kmer_end = min(edit, read_length-k);
-  int kmer_end = min(edit, trim_length-k);
+  int kmer_end = min(edit, trim_length-bithash::k);
 
   check_count += (kmer_end - kmer_start + 1);
 
   bool non_acgt = false;
-  for(i = kmer_start; i < kmer_end+k; i++)
+  for(i = kmer_start; i < kmer_end+bithash::k; i++)
     if(seq[i] >=4)
       non_acgt = true;
 
@@ -811,7 +792,7 @@ bool Read::check_trust(corrected_read *cr, bithash *trusted, unsigned int & chec
     cr->untrusted.set(kmer_start, !trusted->check(&seq[kmer_start], kmermap));
     for(i = kmer_start+1; i <= kmer_end; i++) {
       // check kmer using map value
-      cr->untrusted.set(i, !trusted->check(kmermap, seq[i-1], seq[i+k-1]));
+      cr->untrusted.set(i, !trusted->check(kmermap, seq[i-1], seq[i+bithash::k-1]));
     }
   }
 

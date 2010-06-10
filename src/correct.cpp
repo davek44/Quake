@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:f:m:b:c:a:t:q:p:z:ICuh";
+const static char* myopts = "r:f:k:m:b:c:a:t:q:p:z:ICuh";
 static struct option  long_options [] = {
   {"headers", 0, 0, 1000},
   {0, 0, 0, 0}
@@ -25,6 +25,9 @@ static struct option  long_options [] = {
 static char* fastqf = NULL;
 // -f, file of fastq files of reads
 static char* file_of_fastqf = NULL;
+
+// -k, kmer size
+static int k = 0;
 
 // -m, mer counts
 static char* merf = NULL;
@@ -61,7 +64,7 @@ static unsigned int chunks_per_thread = 200;
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
-#define TESTING false
+#define TESTING true
 static const char* nts = "ACGTN";
 static const unsigned int max_qual = 50;
 
@@ -135,6 +138,14 @@ static void parse_command_line(int argc, char **argv) {
     case 'f':
       file_of_fastqf = strdup(optarg);
       break;
+
+    case 'k':
+      k = int(strtod(optarg, &p));
+      if(p == optarg || k <= 2) {
+	fprintf(stderr, "Bad kmer size \"%s\"\n",optarg);
+	errflg = true;
+      }
+      break;  
 
     case 'm':
       merf = strdup(optarg);
@@ -228,6 +239,11 @@ static void parse_command_line(int argc, char **argv) {
   ////////////////////////////////////////
   if(fastqf == NULL && file_of_fastqf == NULL) {
     cerr << "Must provide a fastq file of reads (-r) or a file containing a list of fastq files of reads (-f)" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  if(k == 0) {
+    cerr << "Must provide kmer size (-k)" << endl;
     exit(EXIT_FAILURE);
   }
 
@@ -979,7 +995,7 @@ int main(int argc, char **argv) {
   unsigned long long atgc[2] = {0};
 
   // make trusted kmer data structure
-  bithash *trusted = new bithash();
+  bithash *trusted = new bithash(k);
 
   // get kmer counts
   if(merf != NULL) {

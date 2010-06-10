@@ -5,7 +5,10 @@
 
 using namespace::std;
 
-bithash::bithash() {
+bithash::bithash(int _k)
+  :bits( (int)pow(4.0,_k) )
+{
+  k = _k;
   mask = (unsigned long long)pow(4.0,k) - 1;
 }
 
@@ -29,7 +32,7 @@ void bithash::add(unsigned long long kmer) {
 //
 // Can handle N's!  Returns False!
 ////////////////////////////////////////////////////////////
-bool bithash::check(unsigned kmer[k]) {
+bool bithash::check(unsigned kmer[]) {
   unsigned long long kmermap = 0;
   for(int i = 0; i < k; i++) {
     if(kmer[i] < 4) {
@@ -49,7 +52,7 @@ bool bithash::check(unsigned kmer[k]) {
 //
 // Can't handle N's!
 ////////////////////////////////////////////////////////////
-bool bithash::check(unsigned kmer[k], unsigned long long & kmermap) {
+bool bithash::check(unsigned kmer[], unsigned long long & kmermap) {
   kmermap = 0;
   for(int i = 0; i < k; i++) {
     if(kmer[i] < 4) {

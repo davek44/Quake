@@ -22,7 +22,7 @@ int LEN = 0;
 int BAD_CHAR = 0;
 int PRINT_SIMPLE = 1;
 const char* bintoascii = "ACGT";
-int bytes_per_kmer = 43; // limit size
+int bytes_per_kmer = 44; // limit size
 Mer_t Forward_Mask = 0;
 
 //  Return the binary equivalent of  ch .
