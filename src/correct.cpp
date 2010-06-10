@@ -64,7 +64,7 @@ static unsigned int chunks_per_thread = 200;
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
-#define TESTING true
+#define TESTING false
 static const char* nts = "ACGTN";
 static const unsigned int max_qual = 50;
 
@@ -89,6 +89,8 @@ static void  Usage
 	   " -f <file>\n"
 	   "    File containing fastq file names, one per line or\n"
 	   "    or two per line for paired end reads.\n"
+	   " -k <num>\n"
+	   "    K-mer size to correct.\n"
 	   " -m <file>\n"
 	   "    File containing kmer counts in format `seq\tcount`.\n"
 	   "    Can also be piped in with '-'\n"

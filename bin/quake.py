@@ -61,13 +61,13 @@ def main():
 
     if options.model_gc:
         # run correct C++ code
-        os.system('correct -r %s -m %s -a cutoffs.gc.txt -p %d %s' % (options.readsf, ctsf, options.proc, options.illumina_qual))
+        os.system('correct -r %s -k %d -m %s -a cutoffs.gc.txt -p %d %s' % (options.readsf, options.k, ctsf, options.proc, options.illumina_qual))
 
     else:
         cutoff = open('cutoff.txt').readline().rstrip()
 
         # run correct C++ code
-        os.system('correct -r %s -m %s -c %s -p %d %s' % (options.readsf, ctsf, cutoff, options.proc, options.illumina_qual))
+        os.system('correct -r %s -k %d -m %s -c %s -p %d %s' % (options.readsf, options.k, ctsf, cutoff, options.proc, options.illumina_qual))
 
 
 ############################################################
