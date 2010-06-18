@@ -6,7 +6,7 @@
 using namespace::std;
 
 bithash::bithash(int _k)
-  :bits( (int)pow(4.0,_k) )
+   :bits( (unsigned long long int)pow(4.0,_k) )
 {
   k = _k;
   mask = (unsigned long long)pow(4.0,k) - 1;

@@ -131,7 +131,7 @@ def model_q_gc_cutoffs(ctsf, sample, ratio):
         kmer_i = 0
         rand_i = 0
         for line in open(ctsf):
-            (kmer,cov) = line.splt()
+            (kmer,cov) = line.split()
             if count_at(kmer) == at:
                 if kmer_i == rand_covs[rand_i]:
                     print >> out, cov
