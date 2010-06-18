@@ -10,13 +10,16 @@
 #include "bithash.h"
 
 using namespace::std;
+int bithash::k;
 
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "m:c:o:";
+const static char* myopts = "m:k:c:o:";
 // -m, kmer count file
 static char* merf = NULL;
+// -k, kmer size
+static int k = 0;
 // -c, kmer count trusted cutoff
 static double cutoff = NULL;
 // -a, AT cutoff
@@ -42,6 +45,8 @@ static void  Usage
 	   " -m <file>\n"
 	   "    File containg kmer counts in format `seq\tcount`.\n"
 	   "    Can also be piped in with '-'\n"
+	   " -k <num>\n"
+           "    K-mer size to correct.\n"
 	   " -c <num>\n"
 	   "    Separate trusted/untrusted kmers at cutoff <num>\n"
 	   " -a <file>\n"
@@ -68,6 +73,14 @@ static void parse_command_line(int argc, char **argv) {
     switch(ch) {
     case 'm':
       merf = strdup(optarg);
+      break;
+      
+    case 'k':
+      k = int(strtod(optarg, &p));
+      if(p == optarg || k <= 2) {
+	 fprintf(stderr, "Bad kmer size \"%s\"\n",optarg);
+	 errflg = true;
+      }
       break;
 
     case 'c':
@@ -108,6 +121,11 @@ static void parse_command_line(int argc, char **argv) {
   ////////////////////////////////////////
   // correct user input errors
   ////////////////////////////////////////  
+  if(k == 0) {
+    cerr << "Must provide kmer size (-k)" << endl;
+    exit(EXIT_FAILURE);
+  }
+
   if(cutoff == 0 && ATcutf == NULL) {
     cerr << "Must provide a trusted/untrusted kmer cutoff (-c) or a file containing the cutoff as a function of the AT content (-a)" << endl;
     exit(EXIT_FAILURE);
@@ -152,7 +170,7 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
   
   // make trusted kmer data structure
-  bithash *trusted = new bithash();
+  bithash *trusted = new bithash(k);
   if(ATcutf != NULL) {
     if(strcmp(merf,"-") == 0)
       trusted->tab_file_load(cin, load_AT_cutoffs(), NULL);

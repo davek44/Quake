@@ -1,4 +1,4 @@
-#!/fs/sz-user-supported/Linux-i686/bin/python2.5
+#!/usr/bin/env python
 from optparse import OptionParser
 import os, random
 
@@ -34,9 +34,9 @@ def main():
         
     else:
         if options.model_gc:
-            model_q_gc_cutoffs(ctsf, 10000, options.ratio)
+            model_q_gc_cutoffs(ctsf, 25000, options.ratio)
         else:
-            model_q_cutoff(ctsf, 25000, options.ratio, options.no_sample)
+            model_q_cutoff(ctsf, 50000, options.ratio, options.no_sample)
             print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
 
 
@@ -109,6 +109,59 @@ def model_q_cutoff(ctsf, sample, ratio, no_sample=False):
 # GC value
 ############################################################
 def model_q_gc_cutoffs(ctsf, sample, ratio):
+    # count number of kmer coverages at each at
+    k = len(open(ctsf).readline().split()[0])
+    num_covs_at = [0]*(k+1)
+    for line in open(ctsf):
+        kmer = line.split()[0]
+        num_covs_at[count_at(kmer)] += 1
+
+    # for each AT bin
+    at_cutoffs = []
+    for at in range(1,k):
+        # sample covs
+        if sample >= num_covs_at[at]:
+            rand_covs = range(num_covs_at[at])
+        else:
+            rand_covs = random.sample(xrange(num_covs_at[at]), sample)
+        rand_covs.sort()
+
+        # print to file
+        out = open('kmers.txt', 'w')
+        kmer_i = 0
+        rand_i = 0
+        for line in open(ctsf):
+            (kmer,cov) = line.splt()
+            if count_at(kmer) == at:
+                if kmer_i == rand_covs[rand_i]:
+                    print >> out, cov
+                    rand_i += 1
+                    if rand_i >= sample:
+                        break
+                kmer_i += 1
+        out.close()
+        
+        os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,r_dir,at))
+
+        at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
+        if at in [1,k-1]:   # setting extremes to next closests
+            at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
+
+        os.system('mv kmers.txt kmers.at%d.txt' % at)
+        os.system('mv cutoff.txt cutoff.at%d.txt' % at)
+
+    out = open('cutoffs.gc.txt','w')
+    print >> out, '\n'.join(at_cutoffs)
+    out.close()
+
+
+############################################################
+# model_q_gc_cutoffs_bigmem
+#
+# Sample kmers to give to R to learn the cutoff for each
+# GC value
+############################################################
+def model_q_gc_cutoffs_bigmem(ctsf, sample, ratio):
     # input coverages
     k = 0
     for line in open(ctsf):
