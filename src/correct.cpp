@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:f:k:m:b:c:a:t:q:p:z:ICuh";
+const static char* myopts = "r:f:k:m:b:c:a:t:q:l:p:z:Cuh";
 static struct option  long_options [] = {
   {"headers", 0, 0, 1000},
   {0, 0, 0, 0}
@@ -40,11 +40,11 @@ static double cutoff = 0;
 static char* ATcutf = NULL;
 
 // -q
-static int trimq = 3;
-// -I
-bool Read::illumina_qual = false;
-// -t
+int Read::quality_scale = -1;
+// -l
 static int trim_t = 30;
+// -t
+static int trimq = 3;
 
 // -p, number of threads
 static int threads = 4;
@@ -103,12 +103,14 @@ static void  Usage
 	   "    content, with cutoffs found in <file>, one per line\n"
 	   " -p <num>\n"
 	   "    Use <num> openMP threads\n"
-	   " -t <num>=30\n"
-	   "    Return only reads trimmed to >= <num> bp\n"
-	   " -q <num>=3\n"
+	   " -l <num>=30\n"
+	   "    Return only reads corrected and/or trimmed to >= <num>\n"
+	   "    bp\n"
+	   " -q <num>\n"
+	   "    Quality value ascii scale.  Older reads may be 33.  If\n"
+	   "    not specified, it will guess.\n"
+	   " -t <num>=3\n"
 	   "    Use BWA trim parameter <num>\n"
-	   " -I\n"
-	   "    Use 64 scale Illumina quality values (else base 33)\n"
 	   " -u\n"
 	   "    Output errors reads even if they can't be corrected\n"
 	   " --headers\n"
@@ -173,7 +175,7 @@ static void parse_command_line(int argc, char **argv) {
       ATcutf = strdup(optarg);
       break;
 
-    case 'q':
+    case 't':
       trimq = int(strtol(optarg, &p, 10));
       if(p == optarg || trimq < 0) {
 	fprintf(stderr, "Bad trim quality value \"%s\"\n",optarg);
@@ -181,7 +183,7 @@ static void parse_command_line(int argc, char **argv) {
       }
       break;
 
-    case 't':
+    case 'l':
       trim_t = int(strtol(optarg, &p, 10));
       if(p == optarg || trim_t < 1) {
 	fprintf(stderr, "Bad trim threshold \"%s\"\n",optarg);
@@ -189,8 +191,12 @@ static void parse_command_line(int argc, char **argv) {
       }
       break;
 
-    case 'I':
-      Read::illumina_qual = true;
+    case 'q': 
+      Read::quality_scale = int(strtol(optarg, &p, 10));
+      if(p == optarg || Read::quality_scale < 0) {
+	fprintf(stderr, "Bad quality value scale \"%s\"\n",optarg);
+	errflg = true;
+      }
       break;
 
     case 'C':
@@ -259,6 +265,42 @@ static void parse_command_line(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 }
+
+
+////////////////////////////////////////////////////////////
+// guess_quality_scale
+//
+// Guess at ascii scale of quality values by examining
+// a bunch of reads and looking for quality values < 64,
+// in which case we set it to 33.
+////////////////////////////////////////////////////////////
+static void guess_quality_scale(string fqf) {
+  string header, seq, mid, strqual;
+  int reads_to_check = 1000;
+  int reads_checked = 0;
+  ifstream reads_in(fqf.c_str());
+  while(getline(reads_in, header)) {
+    getline(reads_in, seq);
+    getline(reads_in, mid);
+    getline(reads_in, strqual);
+    
+    for(int i = 0; i < strqual.size(); i++) {
+      if(strqual[i] < 64) {
+	cerr << "Guessing quality values are on ascii 33 scale" << endl;
+	Read::quality_scale = 33;
+	reads_in.close();
+	return;
+      }
+    }
+
+    if(++reads_checked >= reads_to_check)
+      break;
+  }
+  reads_in.close();
+  cerr << "Guessing quality values are on ascii 64 scale" << endl;
+  Read::quality_scale = 64;
+}
+
 
 ////////////////////////////////////////////////////////////
 // pa_params
@@ -579,10 +621,7 @@ static void output_read(ofstream & reads_out, int pe_code, string header, string
       if(corseq[i] != ntseq[i]) {
 	corrected = true;
 	// set qual to crap
-	if(Read::illumina_qual)
-	  strqual[i] = 'B';
-	else
-	  strqual[i] = '#';
+	strqual[i] = Read::quality_scale+2;
       }
     }
     // update header
@@ -786,10 +825,7 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 
 	vector<int> iqual;
 	for(int i = 0; i < strqual.size(); i++) {
-	  if(Read::illumina_qual)
-	    iqual.push_back(strqual[i]-64);
-	  else
-	    iqual.push_back(strqual[i]-33);
+	  iqual.push_back(strqual[i]-Read::quality_scale);
 	}
 	
 	// fix error reads
@@ -1040,6 +1076,10 @@ int main(int argc, char **argv) {
   vector<string> fastqfs;
   vector<int> pairedend_codes;
   parse_fastq(fastqfs, pairedend_codes);
+
+  // determine quality value scale
+  if(Read::quality_scale == -1)
+    guess_quality_scale(fastqfs[0]);
 
   // process each file
   string fqf;

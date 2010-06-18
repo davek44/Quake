@@ -98,7 +98,7 @@ class Read {
   const static float trust_spread_t = .1;
   const static float correct_min_t = .000001;
   const static float learning_min_t = .00001;
-  static bool illumina_qual;
+  static int quality_scale;
 
  private:
   bool untrusted_intersect(vector<int> untrusted_subset, vector<short> & region);

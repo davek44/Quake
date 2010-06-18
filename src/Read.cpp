@@ -48,13 +48,8 @@ Read::Read(const string & h, const unsigned int* s, const string & q, vector<int
   for(int i = 0; i < read_length; i++) {
     seq[i] = s[i];
     // quality values of 0,1 lead to p < .25
-    if(illumina_qual) {
-      quals[i] = q[i] - 64;
-      prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-64)/10.0));
-    } else {
-      quals[i] = q[i] - 33;
-      prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-33)/10.0));
-    }
+    quals[i] = q[i] - quality_scale;
+    prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-64)/10.0));
   }
   trusted_read = 0;
   global_like = 1.0;
