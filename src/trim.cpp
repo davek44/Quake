@@ -57,8 +57,8 @@ static void  Usage(char * command)
 	   "    Return only reads corrected and/or trimmed to >= <num>\n"
 	   "    bp\n"
 	   " -q <num>\n"
-	   "    Quality value ascii scale.  Older reads may be 33.  If\n"
-	   "    not specified, it will guess.\n"
+	   "    Quality value ascii scale, generally 64 or 33. If not\n"
+	   "    specified, it will guess.\n"
 	   " -t <num>=3\n"
 	   "    Use BWA trim parameter <num>\n"
            "\n");

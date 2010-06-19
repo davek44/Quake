@@ -66,12 +66,12 @@ computation, and the -p option specifies the number of threads to use.
 Alternatively, this step can be performed using Hadoop.
 
 Command:
-correct -f [fastq list file] -c [cutoff] -m [counts file] -z /fs/attic/fastqdir -p 16
+correct -f [fastq list file] -k [k-mer size] -c [cutoff] -m [counts file] -z /fs/attic/fastqdir -p 16
 
 
 If you expect to run 'correct' many times and have a large counts file,
 you can build the data structure used to store trusted k-mers offline.
 
 Command:
-build_bithash -m <counts file> -c <cutoff> -o <bithash file>
-correct -f <fastq list file> -b <bithash file> -z /fs/attic/fastqdir -p 16
+build_bithash -k [k-mer size] -m [counts file] -c [cutoff] -o [bithash file]
+correct -k [k-mer size] -f [fastq list file] -b [bithash file] -z /fs/attic/fastqdir -p 16

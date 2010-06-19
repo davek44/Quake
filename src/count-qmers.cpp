@@ -1,6 +1,7 @@
 #include  <string>
 #include  <vector>
 #include  <iostream>
+#include  <fstream>
 #include  <math.h>
 #include  "count.h"
 
@@ -12,7 +13,10 @@ typedef hash_map<Mer_t, double, hash<unsigned long> > MerTable_t;
 static void CountMers (const string & s, const string & q, MerTable_t & mer_table);
 static void PrintMers(const MerTable_t & mer_table, int min_count);
 
-bool Illumina_qual = false;
+////////////////////////////////////////////////////////////
+// Additional options
+////////////////////////////////////////////////////////////
+int quality_scale = -1;
 
 //////////////////////////////////////////////////////////////////////
 // Usage
@@ -31,8 +35,10 @@ static void Usage (char * command)
 	  "  -f <fastq> fastq file to count\n"
 	  "  -k <len>   Length of kmer \n"
 	  "  -m <min>   Minimum count to report (default: >0)\n"
-	  "  -l <limit> Gigabyte limit on RAM. If limited, the output will contain redundancies\n"
-	  "  -I         Use 64 scale Illumina quality values (else base 33)\n"
+	  "  -l <limit> Gigabyte limit on RAM. If limited, the output will\n"
+	  "             contain redundancies\n"
+	  "  -q <num>   Quality value ascii scale, generally 64 or 33.  If\n"
+	  "             not specified, it will guess.\n"
 	  "\n");
   return;
 }
@@ -77,8 +83,12 @@ static void parse_command_line(int argc, char **argv) {
       }
       break;
 
-    case 'I':
-      Illumina_qual = true;
+    case 'q': 
+      quality_scale = int(strtol(optarg, &p, 10));
+      if(p == optarg || quality_scale < 0) {
+	fprintf(stderr, "Bad quality value scale \"%s\"\n",optarg);
+	errflg = true;
+      }
       break;
       
     case 'h':
@@ -109,6 +119,41 @@ static void parse_command_line(int argc, char **argv) {
   Forward_Mask = ((long long unsigned) 1 << (2 * Kmer_Len - 2)) - 1;
 }
 
+
+////////////////////////////////////////////////////////////
+// guess_quality_scale
+//
+// Guess at ascii scale of quality values by examining
+// a bunch of reads and looking for quality values < 64,
+// in which case we set it to 33.
+////////////////////////////////////////////////////////////
+static void guess_quality_scale(char* fqf) {
+  string header, seq, mid, strqual;
+  int reads_to_check = 1000;
+  int reads_checked = 0;
+  ifstream reads_in(fqf);
+  while(getline(reads_in, header)) {
+    getline(reads_in, seq);
+    getline(reads_in, mid);
+    getline(reads_in, strqual);
+    
+    for(int i = 0; i < strqual.size(); i++) {
+      if(strqual[i] < 64) {
+	cerr << "Guessing quality values are on ascii 33 scale" << endl;
+	quality_scale = 33;
+	reads_in.close();
+	return;
+      }
+    }
+
+    if(++reads_checked >= reads_to_check)
+      break;
+  }
+  reads_in.close();
+  cerr << "Guessing quality values are on ascii 64 scale" << endl;
+  quality_scale = 64;
+}
+
 //////////////////////////////////////////////////////////////////////
 // main
 //////////////////////////////////////////////////////////////////////
@@ -130,6 +175,8 @@ int  main (int argc, char * argv [])
         exit(1);
       }
   }
+
+  guess_quality_scale(fastqfile);
 
   cerr << "Processing sequences..." << endl;
 
@@ -182,10 +229,7 @@ static void  CountMers (const string & s, const string & q, MerTable_t & mer_tab
    vector<double> quals;
    double quality = 1.0;
    for(i = 0; i < q.size(); i++) {
-     if(Illumina_qual)
-       quals.push_back(max(.25, 1.0-pow(10.0,-(q[i]-64)/10.0)));
-     else
-       quals.push_back(max(.25, 1.0-pow(10.0,-(q[i]-33)/10.0)));
+      quals.push_back(max(.25, 1.0-pow(10.0,-(q[i]-quality_scale)/10.0)));
    }
 
    InitMer(fwd_mer);
