@@ -16,9 +16,11 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:t:q:p:Ih";
+const static char* myopts = "r:f:t:q:l:p:h";
 // -r, fastq file of reads
-static char* fastqf = NULL;
+//char* fastqf;
+// -f, file of fastq files of reads
+//char* file_of_fastqf;
 // -t
 static int trimq = 3;
 // -q
@@ -51,7 +53,10 @@ static void  Usage(char * command)
            "\n"
 	   "Options:\n"
 	   " -r <file>\n"
-	   "    Fastq file of reads to trim\n"
+	   "    Fastq file of reads\n"
+	   " -f <file>\n"
+	   "    File containing fastq file names, one per line or\n"
+	   "    two per line for paired end reads.\n"
 	   " -p <num>\n"
 	   "    Use <num> openMP threads\n"
 	   " -l <num>=30\n"
@@ -82,6 +87,10 @@ static void parse_command_line(int argc, char **argv) {
     switch(ch) {
     case 'r':
       fastqf = strdup(optarg);
+      break;
+
+    case 'f':
+      file_of_fastqf = strdup(optarg);
       break;
 
     case 't':
@@ -142,8 +151,8 @@ static void parse_command_line(int argc, char **argv) {
   ////////////////////////////////////////
   // correct user input errors
   ////////////////////////////////////////
-  if(fastqf == NULL) {
-    cerr << "Must provide a fastq file of reads with -r" << endl;
+  if(fastqf == NULL && file_of_fastqf == NULL) {
+    cerr << "Must provide a fastq file of reads (-r) or a file containing a list of fastq files of reads (-f)" << endl;
     exit(EXIT_FAILURE);
   }
 }
@@ -152,10 +161,9 @@ static void parse_command_line(int argc, char **argv) {
 ////////////////////////////////////////////////////////////
 // trim_reads
 ////////////////////////////////////////////////////////////
-static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & counts) {
+static void trim_reads(string fqf, int pe_code, vector<streampos> & starts, vector<unsigned long long> & counts) {
   //format output file
-  string fqf_str(fastqf);
-  string out_dir("."+fqf_str);
+  string out_dir("."+fqf);
   mkdir(out_dir.c_str(), S_IRWXU);
 
   unsigned int chunk = 0;
@@ -164,7 +172,7 @@ static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & 
     int tid = omp_get_thread_num();
 
     // input
-    ifstream reads_in(fastqf);
+    ifstream reads_in(fqf.c_str());
     
     unsigned int tchunk;
     string header,ntseq,strqual,mid;
@@ -215,6 +223,8 @@ static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & 
 	// print if large enough
 	if(ntseq.size() >= trim_t) {
 	  reads_out << header << endl << ntseq << endl << mid << endl << strqual.substr(0, ntseq.size()) << endl;
+	} else if(pe_code > 0) {
+	  reads_out << header << " error" << endl << ntseq << endl << mid << endl << strqual.substr(0, ntseq.size()) << endl;
 	}
 	
 	delete r;
@@ -226,7 +236,9 @@ static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & 
     }
     reads_in.close();
   }
-  combine_output(fqf_str, string("trim"));
+
+  if(pe_code == 0)
+    combine_output(fqf, string("trim"));
 }
 
 
@@ -236,22 +248,37 @@ static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & 
 int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
-  string fastqf_str(fastqf);
+  // make list of files
+  vector<string> fastqfs;
+  vector<int> pairedend_codes;
+  parse_fastq(fastqfs, pairedend_codes);
 
-  guess_quality_scale(fastqf_str);
+  // determine quality value scale
+  if(Read::quality_scale == -1)
+    guess_quality_scale(fastqfs[0]);
 
-  // set up parallelism
-  vector<streampos> starts;
-  vector<unsigned long long> counts;
-  chunkify_fastq(fastqf_str, starts, counts);
+  // process each file
+  string fqf;
+  for(int f = 0; f < fastqfs.size(); f++) {
+    fqf = fastqfs[f];
+    cout << fqf << endl; 
+
+    // split up file
+    vector<streampos> starts;
+    vector<unsigned long long> counts;
+    chunkify_fastq(fqf, starts, counts);
     
-  /*
-  for(int i = 0; i < counts.size(); i++) {
-    cout << i << " " << starts[i] << " " << counts[i] << endl;
+    /*
+    for(int i = 0; i < counts.size(); i++)
+      cout << i << " " << starts[i] << " " << counts[i] << endl;
+    */
+    
+    trim_reads(fqf, pairedend_codes[f], starts, counts);
+
+    // combine paired end
+    if(pairedend_codes[f] == 2)
+      combine_output_paired(fastqfs[f-1], fqf, string("trim"));
   }
-  */
-  
-  trim_reads(starts, counts);
 
   return 0;
 }

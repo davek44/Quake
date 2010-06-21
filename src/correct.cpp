@@ -23,9 +23,9 @@ static struct option  long_options [] = {
 };
 
 // -r, fastq file of reads
-static char* fastqf = NULL;
+//char* fastqf;
 // -f, file of fastq files of reads
-static char* file_of_fastqf = NULL;
+//char* file_of_fastqf;
 
 // -k, kmer size
 static int k = 0;
@@ -88,7 +88,7 @@ static void  Usage
 	   "    Fastq file of reads\n"
 	   " -f <file>\n"
 	   "    File containing fastq file names, one per line or\n"
-	   "    or two per line for paired end reads.\n"
+	   "    two per line for paired end reads.\n"
 	   " -k <num>\n"
 	   "    K-mer size to correct.\n"
 	   " -m <file>\n"
@@ -514,7 +514,7 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
   }
 
   if(pe_code == 0)
-       combine_output(fqf, string("cor"));
+    combine_output(fqf, string("cor"));
 }
 
 
@@ -704,74 +704,6 @@ void zip_fastq(const char* fqf) {
   strcat(mycmd, ".gz ");
   strcat(mycmd, zipd);
   system(mycmd);
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// split
-//
-// Split on whitespace
-////////////////////////////////////////////////////////////////////////////////
-vector<string> split(string s) {
-  vector<string> splits;
-  int split_num = 0;
-  bool last_space = true;
-
-  for(int i = 0; i < s.size(); i++) {
-    if(s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r') {
-      if(!last_space)
-	split_num++;
-      last_space = true;
-    } else {
-      if(split_num == splits.size())
-	splits.push_back("");
-      splits[split_num] += s[i];
-      last_space = false;
-    }
-  }
-
-  return splits;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// parse_fastq
-//
-// Accept a single fastq file from input, or parse a file with names of fastq
-// files.  For multiple files, attached a paired end code to tell the correction
-// method how to handle the file.
-////////////////////////////////////////////////////////////////////////////////
-vector<string> parse_fastq(vector<string> & fastqfs, vector<int> & pairedend_codes) {
-  if(file_of_fastqf != NULL) {
-    ifstream ff(file_of_fastqf);
-    vector<string> next_fastqf;
-    string line;
-
-    while(getline(ff, line) && line.size() > 0) {
-      next_fastqf = split(line);
-
-      if(next_fastqf.size() == 1) {
-	fastqfs.push_back(next_fastqf[0]);
-	pairedend_codes.push_back(0);
-
-      } else if(next_fastqf.size() == 2) {
-	fastqfs.push_back(next_fastqf[0]);
-	fastqfs.push_back(next_fastqf[1]);
-	pairedend_codes.push_back(1);
-	pairedend_codes.push_back(2);
-
-      } else {
-	cerr << "File of fastq file names must have a single fastq file per line for single reads or two fastqf files per line separated by a space for paired end reads " << endl;
-	exit(EXIT_FAILURE);
-      }
-    }
-
-  } else {
-    fastqfs.push_back(string(fastqf));
-    pairedend_codes.push_back(0);
-  }
-
-  return fastqfs;
 }
 
 
