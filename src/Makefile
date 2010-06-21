@@ -10,8 +10,8 @@ all: $(EXE_FILES)
 clean:
 	-rm $(EXE_FILES) *.o
 
-correct: correct.cpp Read.o bithash.o
-	$(CC) $(CFLAGS) correct.cpp Read.o bithash.o -o correct
+correct: correct.cpp Read.o bithash.o edit.o
+	$(CC) $(CFLAGS) correct.cpp Read.o bithash.o edit.o -o correct
 
 count-kmers: count-kmers.cpp count.o
 	$(CC) $(CFLAGS) count-kmers.cpp count.o -o count-kmers
@@ -25,8 +25,8 @@ reduce-kmers: reduce-kmers.cpp
 reduce-qmers: reduce-qmers.cpp
 	$(CC) $(CFLAGS) reduce-qmers.cpp -o reduce-qmers
 
-trim: trim.cpp Read.o bithash.o
-	$(CC) $(CFLAGS) trim.cpp Read.o bithash.o -o trim
+trim: trim.cpp Read.o bithash.o edit.o
+	$(CC) $(CFLAGS) trim.cpp Read.o bithash.o edit.o -o trim
 
 build_bithash: build_bithash.cpp bithash.o
 	$(CC) $(CFLAGS) build_bithash.cpp bithash.o -o build_bithash
@@ -36,6 +36,9 @@ correct_stats: stats.cpp
 
 Read.o: Read.cpp Read.h bithash.o
 	$(CC) $(CFLAGS) -c Read.cpp
+
+edit.o: edit.cpp edit.h
+	$(CC) $(CFLAGS) -c edit.cpp
 
 bithash.o: bithash.cpp bithash.h
 	$(CC) $(CFLAGS) -c bithash.cpp

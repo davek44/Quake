@@ -6,7 +6,7 @@
 #include <set>
 #include <queue>
 
-#define TESTING false
+#define TESTING true
 
 int bithash::k;
 
@@ -49,7 +49,7 @@ Read::Read(const string & h, const unsigned int* s, const string & q, vector<int
     seq[i] = s[i];
     // quality values of 0,1 lead to p < .25
     quals[i] = q[i] - quality_scale;
-    prob[i] = max(.25, 1.0-pow(10.0,-(q[i]-64)/10.0));
+    prob[i] = max(.25, 1.0-pow(10.0,-(quals[i]/10.0)));
   }
   trusted_read = 0;
   global_like = 1.0;

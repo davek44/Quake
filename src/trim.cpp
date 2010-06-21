@@ -1,5 +1,6 @@
 #include "Read.h"
 #include "bithash.h"
+#include "edit.h"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -21,16 +22,16 @@ static char* fastqf = NULL;
 // -t
 static int trimq = 3;
 // -q
-int Read::quality_scale = -1;
+//int Read::quality_scale;
 // -l
 static int trim_t = 30;
 // -p, number of threads
-static int threads = 4;
+//int threads;
 
 // constants
 static const char* nts = "ACGTN";
 
-static unsigned int chunks_per_thread = 200;
+//unsigned int chunks_per_thread;
 
 ////////////////////////////////////////////////////////////
 // Usage
@@ -149,136 +150,13 @@ static void parse_command_line(int argc, char **argv) {
 
 
 ////////////////////////////////////////////////////////////
-// pa_params
-////////////////////////////////////////////////////////////
-void pa_params(vector<streampos> & starts, vector<unsigned long long> & counts) {
-  // count number of sequences
-  unsigned long long N = 0;
-  ifstream reads_in(fastqf);
-  string toss;
-  while(getline(reads_in, toss))
-    N++;
-  reads_in.close();
-  N /= 4ULL;
-
-  if(threads*chunks_per_thread > N) {
-    // use 1 thread for everything
-    counts.push_back(N);
-    starts.push_back(0);   
-    omp_set_num_threads(1);
-
-  } else {
-    // determine counts per thread
-    unsigned long long sum = 0;
-    for(int i = 0; i < threads*chunks_per_thread-1; i++) {
-      counts.push_back(N / (threads*chunks_per_thread));
-      sum += counts.back();
-    }
-    counts.push_back(N - sum);
-
-    // find start points
-    reads_in.open(fastqf);
-    starts.push_back(reads_in.tellg());
-    unsigned long long s = 0;
-    unsigned int t = 0;
-    while(getline(reads_in,toss)) {
-      // sequence
-      getline(reads_in, toss);
-      // +
-      getline(reads_in, toss);
-      // quality
-      getline(reads_in, toss);
-      
-      if(++s == counts[t] && t < counts.size()-1) {
-	starts.push_back(reads_in.tellg());
-	s = 0;
-	t++;
-      }
-      
-      // set up parallelism
-      omp_set_num_threads(threads);
-    }
-  }
-}
-
-
-////////////////////////////////////////////////////////////
-// combine_output
-//
-// Combine output files into one.
-////////////////////////////////////////////////////////////
-static void combine_output(const char* outf) {
-  ofstream combine_out(outf);
-  char strt[10];
-  char toutf[50];
-  string line;
-  struct stat st_file_info;
-  
-  for(int t = 0; t < threads*chunks_per_thread; t++) {
-    strcpy(toutf, outf);
-    sprintf(strt,"%d",t);
-    strcat(toutf, strt);
-
-    // if file exists, add to single output
-    if(stat(toutf, &st_file_info) == 0) {
-      ifstream thread_out(toutf);
-      while(getline(thread_out, line))
-	combine_out << line << endl;
-      thread_out.close();
-      
-      remove(toutf);
-    }
-  }
-
-  combine_out.close();
-}
-
-
-////////////////////////////////////////////////////////////
-// guess_quality_scale
-//
-// Guess at ascii scale of quality values by examining
-// a bunch of reads and looking for quality values < 64,
-// in which case we set it to 33.
-////////////////////////////////////////////////////////////
-static void guess_quality_scale() {
-  string header, seq, mid, strqual;
-  int reads_to_check = 1000;
-  int reads_checked = 0;
-  ifstream reads_in(fastqf);
-  while(getline(reads_in, header)) {
-    getline(reads_in, seq);
-    getline(reads_in, mid);
-    getline(reads_in, strqual);
-    
-    for(int i = 0; i < strqual.size(); i++) {
-      if(strqual[i] < 64) {
-	cerr << "Guessing quality values are on ascii 33 scale" << endl;
-	Read::quality_scale = 33;
-	reads_in.close();
-	return;
-      }
-    }
-
-    if(++reads_checked >= reads_to_check)
-      break;
-  }
-  reads_in.close();
-  cerr << "Guessing quality values are on ascii 64 scale" << endl;
-  Read::quality_scale = 64;
-}
-
-
-////////////////////////////////////////////////////////////
 // trim_reads
 ////////////////////////////////////////////////////////////
 static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & counts) {
   //format output file
   string fqf_str(fastqf);
-  int suffix_index = fqf_str.rfind(".");
-  string prefix = fqf_str.substr(0, suffix_index);
-  string suffix = fqf_str.substr(suffix_index, fqf_str.size()-suffix_index);
-  string outf = prefix + string(".trim") + suffix;
+  string out_dir("."+fqf_str);
+  mkdir(out_dir.c_str(), S_IRWXU);
 
   unsigned int chunk = 0;
 #pragma omp parallel //shared(trusted)
@@ -288,7 +166,7 @@ static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & 
     // input
     ifstream reads_in(fastqf);
     
-     unsigned int tchunk;
+    unsigned int tchunk;
     string header,ntseq,strqual,mid;
     char* nti;
     Read *r;
@@ -302,7 +180,7 @@ static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & 
       reads_in.seekg(starts[tchunk]);
 
       // output
-      string toutf(outf);
+      string toutf(out_dir+"/");
       stringstream tconvert;
       tconvert << tchunk;
       toutf += tconvert.str();
@@ -348,7 +226,7 @@ static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & 
     }
     reads_in.close();
   }
-  combine_output(outf.c_str());
+  combine_output(fqf_str, string("trim"));
 }
 
 
@@ -358,12 +236,14 @@ static void trim_reads(vector<streampos> & starts, vector<unsigned long long> & 
 int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
-  guess_quality_scale();
+  string fastqf_str(fastqf);
+
+  guess_quality_scale(fastqf_str);
 
   // set up parallelism
   vector<streampos> starts;
   vector<unsigned long long> counts;
-  pa_params(starts, counts);
+  chunkify_fastq(fastqf_str, starts, counts);
     
   /*
   for(int i = 0; i < counts.size(); i++) {
