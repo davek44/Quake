@@ -6,7 +6,7 @@
 #include <set>
 #include <queue>
 
-#define TESTING true
+#define TESTING false
 
 int bithash::k;
 

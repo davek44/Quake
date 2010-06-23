@@ -85,7 +85,7 @@ static void parse_command_line(int argc, char **argv) {
 
     case 'q': 
       quality_scale = int(strtol(optarg, &p, 10));
-      if(p == optarg || quality_scale < 0) {
+      if(p == optarg || quality_scale < -1) {
 	fprintf(stderr, "Bad quality value scale \"%s\"\n",optarg);
 	errflg = true;
       }
@@ -164,9 +164,13 @@ int  main (int argc, char * argv [])
   MerTable_t mer_table;
 
   FILE * fp;
-  if(strcmp(fastqfile,"-") == 0)
+  if(strcmp(fastqfile,"-") == 0) {
     fp = stdin;
-  else {
+    if(quality_scale == -1) {
+      cerr << "Cannot guess at quality scale on reads from stdin- assuming 64." << endl;
+      quality_scale = 64;
+    }
+  } else {
     cerr << fastqfile << endl;
     fp = fopen(fastqfile, "r");
     if (!fp)
@@ -174,9 +178,9 @@ int  main (int argc, char * argv [])
         cerr << "Couldn't open " << fastqfile << endl;
         exit(1);
       }
+    if(quality_scale == -1)
+      guess_quality_scale(fastqfile);
   }
-
-  guess_quality_scale(fastqfile);
 
   cerr << "Processing sequences..." << endl;
 

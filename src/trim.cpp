@@ -111,7 +111,7 @@ static void parse_command_line(int argc, char **argv) {
 
     case 'q': 
       Read::quality_scale = int(strtol(optarg, &p, 10));
-      if(p == optarg || Read::quality_scale < 0) {
+      if(p == optarg || Read::quality_scale < -1) {
 	fprintf(stderr, "Bad quality value scale \"%s\"\n",optarg);
 	errflg = true;
       }
