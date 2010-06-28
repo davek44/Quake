@@ -70,6 +70,15 @@ bool bithash::check(unsigned kmer[], unsigned long long & kmermap) {
 // check
 //
 // Check for the presence of a sequence in the tree.
+////////////////////////////////////////////////////////////
+bool bithash::check(unsigned long long kmermap) {
+  return bits[kmermap];
+}
+
+////////////////////////////////////////////////////////////
+// check
+//
+// Check for the presence of a sequence in the tree.
 // Pass the kmer map value back by reference to be re-used
 //
 // Can't handle N's!

@@ -71,6 +71,9 @@ def model_cutoff(ctsf, ratio):
 # model_q_cutoff
 #
 # Sample kmers to give to R to learn the cutoff
+# 'div100' is necessary when the number of kmers is too 
+# large for random.sample, so we only consider every 100th
+# kmer.
 ############################################################
 def model_q_cutoff(ctsf, sample, ratio, no_sample=False):
     if not no_sample:
@@ -80,10 +83,15 @@ def model_q_cutoff(ctsf, sample, ratio, no_sample=False):
             num_covs += 1
 
         # choose random kmer coverages
+        div100 = False
         if sample >= num_covs:
             rand_covs = range(num_covs)
         else:
-            rand_covs = random.sample(xrange(num_covs), sample)
+            if num_covs > 1000000000:
+                div100 = True
+                rand_covs = random.sample(xrange(num_covs/100), sample)
+            else:
+                rand_covs = random.sample(xrange(num_covs), sample)
         rand_covs.sort()
 
         # print to file
@@ -91,11 +99,18 @@ def model_q_cutoff(ctsf, sample, ratio, no_sample=False):
         kmer_i = 0
         rand_i = 0
         for line in open(ctsf):
-            if kmer_i == rand_covs[rand_i]:
-                print >> out, line.split()[1]
-                rand_i += 1
-                if rand_i >= sample:
-                    break
+            if div100:
+                if kmer_i % 100 == 0 and kmer_i/100 == rand_covs[rand_i]:
+                    print >> out, line.split()[1]
+                    rand_i += 1
+                    if rand_i >= sample:
+                        break
+            else:
+                if kmer_i == rand_covs[rand_i]:
+                    print >> out, line.split()[1]
+                    rand_i += 1
+                    if rand_i >= sample:
+                        break
             kmer_i += 1
         out.close()
 

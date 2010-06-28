@@ -395,7 +395,7 @@ static void output_read(ofstream & reads_out, int pe_code, string header, string
   } else {
     if(uncorrected_out || pe_code > 0) {
       // update header
-      if(!orig_headers || pe_code > 0)
+      if(!uncorrected_out && !orig_headers && pe_code > 0)
 	header += " error";
       //print
       if(contrail_out)
@@ -513,7 +513,7 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
     reads_in.close();
   }
 
-  if(pe_code == 0)
+  if(pe_code == 0 || uncorrected_out)
     combine_output(fqf, string("cor"));
 }
 
@@ -796,8 +796,8 @@ int main(int argc, char **argv) {
     correct_reads(fqf, pairedend_codes[f], trusted, starts, counts, ntnt_prob, prior_prob);
     
     // combine paired end
-    if(pairedend_codes[f] == 2)
-	 combine_output_paired(fastqfs[f-1], fqf, string("cor"));
+    if(pairedend_codes[f] == 2 && !uncorrected_out)
+      combine_output_paired(fastqfs[f-1], fqf, string("cor"));
 
     // zip
     if(zipd != NULL)

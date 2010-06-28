@@ -15,6 +15,7 @@ class bithash {
   bool check(unsigned kmer[]);
   bool check(unsigned kmer[], long long unsigned & kmermap);
   bool check(long long unsigned & kmermap, unsigned last, unsigned next);
+  bool check(long long unsigned kmermap);
   void meryl_file_load(const char* merf, const double boundary);
   void tab_file_load(istream & mer_in, const double boundary, unsigned long long atgc[]);
   void tab_file_load(istream & mer_in, const vector<double> boundary, unsigned long long atgc[]);
