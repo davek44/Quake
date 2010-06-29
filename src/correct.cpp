@@ -422,7 +422,8 @@ static void output_read(ofstream & reads_out, int pe_code, string header, string
 ////////////////////////////////////////////////////////////////////////////////
 static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
   // output directory
-  string out_dir("."+fqf);
+  string path_suffix = split(fqf,'/').back();
+  string out_dir("."+path_suffix);
   mkdir(out_dir.c_str(), S_IRWXU);
 
   unsigned int chunk = 0;

@@ -163,7 +163,8 @@ static void parse_command_line(int argc, char **argv) {
 ////////////////////////////////////////////////////////////
 static void trim_reads(string fqf, int pe_code, vector<streampos> & starts, vector<unsigned long long> & counts) {
   //format output file
-  string out_dir("."+fqf);
+  string path_suffix = split(fqf,'/').back();
+  string out_dir("."+path_suffix);
   mkdir(out_dir.c_str(), S_IRWXU);
 
   unsigned int chunk = 0;
