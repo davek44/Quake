@@ -19,7 +19,7 @@ library(VGAM)
 if(length(commandArgs(trailingOnly=TRUE)) > 0) {
   ratio.goal = as.integer(commandArgs(trailingOnly=TRUE)[1])
 } else {
-  ratio.goal = 1000
+  ratio.goal = 10
 }
 
 outf = "cutoff.txt"
@@ -136,18 +136,33 @@ ratios = function(cov, p) {
   return(error/no.error)
 }
 
+error.max = function(p) {
+  cov.max = 0
+  dens.max = 0
+  for(c in seq(0,30, .01)) {
+    dens = dgamma(c, shape=p$shape.e, scale=p$scale.e)
+    if(dens > dens.max) {
+      dens.max = dens
+      cov.max = c
+    }
+  }
+  return(cov.max)
+}
+
 cutoff = function(p) {
+  cut.start = error.max(p)
+  
   #ratio.goal = exp(3 + .05*p$u.v)
   #ratio.goal = 1000
   cov.best = 0
   ratio.best = abs(ratios(0,p) - ratio.goal)
-  for(c in seq(0,30,.02)) {
+  for(c in seq(cut.start, 25, .01)) {
     r = abs(ratios(c,p) - ratio.goal)
     if(r < ratio.best) {
       ratio.best = r
       cov.best = c
     }
-    #cat(c," ",ratios(c,p),"\n")
+    cat(c," ",ratios(c,p),"\n")
   }
   return(cov.best)
 }
