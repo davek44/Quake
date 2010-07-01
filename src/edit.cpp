@@ -103,12 +103,12 @@ void combine_output(string fqf, string mid_ext) {
       while(getline(tc_out, line))
 	combine_out << line << endl;
       tc_out.close();
-      //remove(tc_file.c_str());
+      remove(tc_file.c_str());
     }
   }
 
   // remove output directory
-  //rmdir(out_dir.c_str());
+  rmdir(out_dir.c_str());
 
   combine_out.close();
 }
