@@ -73,6 +73,59 @@ vector<string> split(string s, char c)
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// unzip_fastq
+//
+// Unzip read file and remove ".gz" suffix from 'fqf'.
+////////////////////////////////////////////////////////////////////////////////
+void unzip_fastq(string & fqf) {
+  char mycmd[100];
+
+  strcpy(mycmd, "gunzip ");
+  strcat(mycmd, fqf.c_str());
+  system(mycmd);
+
+  fqf.erase(fqf.size()-3);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// zip_fastq
+//
+// Zip the original read file as well as the corrected
+// read files.
+////////////////////////////////////////////////////////////////////////////////
+void zip_fastq(string fqf) {
+  char mycmd[100];
+
+  // gzip fqf
+  strcpy(mycmd, "gzip ");
+  strcat(mycmd, fqf.c_str());
+  system(mycmd);
+
+  // determine output file
+  string fqf_str(fqf);
+  int suffix_index = fqf_str.rfind(".");
+  string prefix = fqf_str.substr(0,suffix_index);
+  string suffix = fqf_str.substr(suffix_index, fqf_str.size()-suffix_index);
+  string pairf = prefix + string(".cor") + suffix;
+  string singlef = prefix + string(".cor.single") + suffix;
+
+  // gzip pair
+  strcpy(mycmd, "gzip ");
+  strcat(mycmd, pairf.c_str());
+  system(mycmd);
+
+  // gzip single
+  struct stat st_file_info;
+  if(stat(singlef.c_str(), &st_file_info) == 0) {
+    strcpy(mycmd, "gzip ");
+    strcat(mycmd, singlef.c_str());
+    system(mycmd);
+  }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // combine_output
 //
 // Combine output files in 'out_dir' into a single file and remove 'out_dir'

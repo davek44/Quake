@@ -16,7 +16,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:f:k:m:b:c:a:t:q:l:p:z:Cuh";
+const static char* myopts = "r:f:k:m:b:c:a:t:q:l:p:Cuh";
 static struct option  long_options [] = {
   {"headers", 0, 0, 1000},
   {0, 0, 0, 0}
@@ -49,8 +49,6 @@ static int trimq = 3;
 
 // -p, number of threads
 //int threads;
-// -z, zip mode directory
-static char* zipd = NULL;
 
 // --headers, Print only normal headers
 static bool orig_headers = false;
@@ -157,10 +155,6 @@ static void parse_command_line(int argc, char **argv) {
 
     case 'b':
       bithashf = strdup(optarg);
-      break;
-
-    case 'z':
-      zipd = strdup(optarg);
       break;
 
     case 'c':
@@ -513,9 +507,6 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
     }
     reads_in.close();
   }
-
-  if(pe_code == 0 || uncorrected_out)
-    combine_output(fqf, string("cor"));
 }
 
 
@@ -656,59 +647,6 @@ vector<double> load_AT_cutoffs() {
 
 
 ////////////////////////////////////////////////////////////
-// unzip_fastq
-//
-// Copy the fastq file to the current directory and unzip it
-////////////////////////////////////////////////////////////
-void unzip_fastq(const char* fqf) {
-  char mycmd[100];
-
-  strcpy(mycmd, "zcat ");
-  strcat(mycmd, zipd);
-  strcat(mycmd, "/");
-  strcat(mycmd, fqf);
-  strcat(mycmd, " > ");
-  strncat(mycmd, fqf, strstr(fqf, ".gz") - fqf);
-  system(mycmd);
-}
-
-
-////////////////////////////////////////////////////////////
-// zip_fastq
-//
-// Remove the fastq file, zip the corrected fastq file, and
-// move it to zipd
-////////////////////////////////////////////////////////////
-void zip_fastq(const char* fqf) {
-  char mycmd[100];
-
-  // rm fqf
-  strcpy(mycmd, "rm ");
-  strcat(mycmd, fqf);
-  system(mycmd);
-
-  // determine output file
-  string fqf_str(fqf);
-  int suffix_index = fqf_str.rfind(".");
-  string prefix = fqf_str.substr(0,suffix_index);
-  string suffix = fqf_str.substr(suffix_index, fqf_str.size()-suffix_index);
-  string outf = prefix + string(".cor") + suffix;
-
-  // zip
-  strcpy(mycmd, "gzip ");
-  strcat(mycmd, outf.c_str());
-  system(mycmd);
-
-  // move
-  strcpy(mycmd, "mv ");
-  strcat(mycmd, outf.c_str());
-  strcat(mycmd, ".gz ");
-  strcat(mycmd, zipd);
-  system(mycmd);
-}
-
-
-////////////////////////////////////////////////////////////
 // main
 ////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
@@ -768,15 +706,17 @@ int main(int argc, char **argv) {
 
   // process each file
   string fqf;
+  bool zip;
   for(int f = 0; f < fastqfs.size(); f++) {
     fqf = fastqfs[f];
     cout << fqf << endl;
 
     // unzip
-    if(zipd != NULL) {
-      unzip_fastq(fqf.c_str());
-      fqf = fqf.substr(0, fqf.size()-3);
-    }
+    if(fqf.substr(fqf.size()-3) == ".gz") {
+      zip = true;
+      unzip_fastq(fqf);
+    } else
+      zip = false;
 
     // split file
     vector<streampos> starts;
@@ -796,13 +736,23 @@ int main(int argc, char **argv) {
     // correct
     correct_reads(fqf, pairedend_codes[f], trusted, starts, counts, ntnt_prob, prior_prob);
     
-    // combine paired end
-    if(pairedend_codes[f] == 2 && !uncorrected_out)
-      combine_output_paired(fastqfs[f-1], fqf, string("cor"));
+    // combine
+    if(pairedend_codes[f] == 0 || uncorrected_out) {
+      combine_output(fqf, string("cor"));
+      if(zip)
+	zip_fastq(fqf);
+    }
 
-    // zip
-    if(zipd != NULL)
-      zip_fastq(fqf.c_str());
+    // combine paired end
+    if(pairedend_codes[f] == 2 && !uncorrected_out) {
+      if(!zip) {
+	combine_output_paired(fastqfs[f-1], fqf, string("cor"));
+      } else {
+	combine_output_paired(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3), fqf, string("cor"));
+	zip_fastq(fqf);
+	zip_fastq(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3));
+      }
+    }
   }
 
   return 0;
