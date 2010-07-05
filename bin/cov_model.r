@@ -171,3 +171,4 @@ err.dist = kmers.probs[,1]/p$p.e
 norm.dist = apply(kmers.probs[,2:(1+max.copy)], 1, sum)/(1-p$p.e)
 
 ratios = err.dist*p$p.e / norm.dist/(1-p$p.e)
+
