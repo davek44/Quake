@@ -9,8 +9,6 @@ import os, random
 # to separate trusted/untrusted kmers.
 ############################################################
 
-r_dir = '/nfshomes/dakelley/research/error_correction/bin'
-
 ############################################################
 # main
 ############################################################
@@ -64,7 +62,7 @@ def model_cutoff(ctsf, ratio):
             print >> cov_out, '%d\t%d' % (cov+1,kmer_hist[cov])
     cov_out.close()
 
-    os.system('R --slave --args %d < %s/cov_model.r 2> r.log' % (ratio,r_dir))
+    os.system('R --slave --args %d < %s/cov_model.r 2> r.log' % (ratio,quake.r_dir))
 
 
 ############################################################
@@ -114,7 +112,7 @@ def model_q_cutoff(ctsf, sample, ratio, no_sample=False):
             kmer_i += 1
         out.close()
 
-    os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,r_dir))
+    os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,quake.r_dir))
 
 
 ############################################################
