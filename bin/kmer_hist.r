@@ -40,27 +40,26 @@ est.mean = function(d) {
 ############################################################
 cov = scan("kmers.txt")
 
-cov.est = est.cov(cov)
-
-max.cov = max(cov)
+cov.mean = est.mean(cov)
+cov.max = max(cov)
 
 ############################################################
 # histogram pdf
 ############################################################
-u = est.cov(cov)
 pdf("kmer_hist.pdf")
-hc = hist(cov, breaks=seq(0,ceiling(max.cov)), plot=F)$counts
-hist(cov, breaks=seq(0,ceiling(max.cov)), xlim=c(0, round(1.7*u)), ylim=c(0, round(1.2*hc[u])), xlab="Coverage", main="k-mer counts")
+hc = hist(cov, breaks=seq(0,ceiling(cov.max)), plot=F)$counts
+hist(cov, breaks=seq(0,ceiling(cov.max)), xlim=c(0, round(1.7*cov.mean)), ylim=c(0, round(1.2*hc[cov.mean])), xlab="Coverage", main="k-mer counts")
 dev.off()
 
 ############################################################
 # histogram txt
 ############################################################
-scov = cov[cov < 5]
-h = hist(scov, breaks=seq(0,5,.1), plot=FALSE)
+hist.max = 2.5*round(cov.mean)
+scov = cov[cov < hist.max]
+h = hist(scov, breaks=seq(0,hist.max,.1), plot=FALSE)
 
 outf = "kmer_hist.bin10.txt"
 cat("", file=outf)
-for(i in seq(1,50)) {
+for(i in seq(1,10*hist.max)) {
   cat(i*.1, "\t", h$counts[i], "\n", sep=" ", file=outf, append=TRUE)
 }
