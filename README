@@ -1,77 +1,15 @@
-Quake is a package to correct substitution sequencing errors in
-experiments with deep coverage (e.g. >20X), specifically intended for
-Illumina sequencing reads.  Quake adopts the k-mer error correction
-framework, first introduced by the EULER genome assembly package.
-Unlike EULER and similar progams, Quake does additional work to
-determine where errors are located and what types of errors are most
-likely.  This leads to much greater accuracy, especially with respect
-to avoiding mis-corrections, which are corrections that create false
-sequence rather than the original genome sequence from which the read
-was taken.
+Quake is a package to correct substitution sequencing errors in experiments with
+deep coverage (e.g. >20X), specifically intended for Illumina sequencing reads.
+Quake adopts the k-mer error correction framework, first introduced by the EULER
+genome assembly package.  Unlike EULER and similar progams, Quake utilizes a
+robust mixture model of erroneous and genuine k-mer distributions to determine
+where errors are located and uses read quality values and learns the nucleotide
+to nucleotide error rates to determine what types of errors are most likely.
+This leads to more corrections and greater accuracy, especially with respect to
+avoiding mis-corrections, which create false sequence unsimilar to anything in
+the original genome sequence from which the read was taken.
 
-Quake is freely available from
-http://github.com/davek44/error_correction, and a manuscript is under
-preparation.  Direct questions, concerns, and feature requests to
-David Kelley (dakelley@umiacs.umd.edu).
-
-
-For a microbial sized dataset, the easiest way to run Quake is with the
-Python script quake.py.
-
-Recommended command:
-quake.py -r [fastq file] -k [k-mer size] -p 2
-
-
-Alternatively, if you encounter problems or are analyzing a large
-dataset, you can run the 3 steps individually:
-
-1. Count k-mers 
-
-Any program that can be made to produce a file where each line has
-"k-mer\tcount" is fine.  I recommend the included programs
-count-kmers and count-qmers.  count-qmers is a variation we've
-experimented with that computes the expected count of each k-mer using
-the read quality values.  Both programs are single-threaded making
-them ill-suited for large genomes, but can easily be adapted to run on
-a Hadoop cluster for such genomes.  Another option is meryl in the
-Celera Assembler package, but it only accepts a single fasta file.
-Expect improvements to this step in the near future.
-
-Recommended command:
-cat [fastq files] | count-qmers -k [k-mer size] > [counts file]
-
-2. Determine cov threshold
-
-Next, using a histogram of the k-mer counts, find the coverage at which
-we will differentiate true and error k-mers.  cov_model.py will
-make the histogram and call an R script cov_model.r that will output
-the threshold.  Note that this R script requires the library VGAM
-which can be installed with the install.packages command in R.  You'll
-need to set the global variable 'r_dir' in cov_model.py to the
-directory where the R script will be.  And if you count k-mers rather
-than q-mers, use the option '--int'.
-
-Command:
-cov_model.py [counts file]
-
-3. Correct reads
-
-To correct reads and output a set of corrected read fastq files, run
-the C++ program 'correct'.  The -r option takes a single fastq file,
-and the -f option takes multiple fastq files by accepting a text file
-with the names of the fastq files, each on their own line.  If the
-fastq files are zipped, use the -z option and provide the directory
-where they will be.  The program uses openMP to parallelize the
-computation, and the -p option specifies the number of threads to use.
-Alternatively, this step can be performed using Hadoop.
-
-Command:
-correct -f [fastq list file] -k [k-mer size] -c [cutoff] -m [counts file] -z /fs/attic/fastqdir -p 16
-
-
-If you expect to run 'correct' many times and have a large counts file,
-you can build the data structure used to store trusted k-mers offline.
-
-Command:
-build_bithash -k [k-mer size] -m [counts file] -c [cutoff] -o [bithash file]
-correct -k [k-mer size] -f [fastq list file] -b [bithash file] -z /fs/attic/fastqdir -p 16
+Quake is freely available from http://www.cbcb.umd.edu/software/quake , and a
+manuscript is under preparation. Instructions on how to use Quake can be found
+at http://www.cbcb.umd.edu/software/quake/manual.html .  Direct questions,
+concerns, and feature requests to David Kelley (dakelley@umiacs.umd.edu).
