@@ -307,8 +307,15 @@ void regress_probs(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[ma
 //
 // Print the error model to the file error_model.txt
 ////////////////////////////////////////////////////////////
-void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max_qual][4][4]) {
-  ofstream mod_out("error_model.txt");
+void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max_qual][4][4], string fqf) {
+  string base = split(fqf,'/').back();
+
+  int suffix_index = base.rfind(".");
+  string prefix = base.substr(0,suffix_index+1);
+
+  string outf = "error_model." + prefix + "txt";
+
+  ofstream mod_out(outf.c_str());
 
   unsigned int ntsum;
   for(int q = 1; q < max_qual; q++) {
@@ -616,7 +623,7 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 
   regress_probs(ntnt_prob, ntnt_counts);
 
-  output_model(ntnt_prob, ntnt_counts);
+  output_model(ntnt_prob, ntnt_counts, fqf);
 }
 
 
