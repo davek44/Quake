@@ -389,7 +389,8 @@ static void output_read(ofstream & reads_out, int pe_code, string header, string
   } else {
     if(uncorrected_out || pe_code > 0) {
       // update header
-      if(!uncorrected_out && !orig_headers && pe_code > 0)
+      //if(!uncorrected_out && !orig_headers && pe_code > 0)
+      if(!uncorrected_out && pe_code > 0)
 	header += " error";
       //print
       if(contrail_out)
