@@ -18,6 +18,9 @@ int Read::quality_scale = -1;
 // -p, number of threads
 int threads = 4;
 
+// -t
+int trimq = 3;
+
 unsigned int chunks_per_thread = 200;
 
 
@@ -398,4 +401,36 @@ vector<string> parse_fastq(vector<string> & fastqfs, vector<int> & pairedend_cod
   }
 
   return fastqfs;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// quick_trim
+//
+// Trim the end of the read the way BWA does it.
+// Removes affected untrusted k-mers.
+// Returns the trimmed length.
+////////////////////////////////////////////////////////////////////////////////
+int quick_trim(string strqual, vector<int> & untrusted) {
+  // find trim index
+  int phredq;
+  int current_trimfunc = 0;
+  int max_trimfunc = 0;
+  int trim_length = strqual.size();
+  for(int i = strqual.size()-1; i >= 0; i--) {
+    //phredq = floor(.5-10*log(1.0 - prob[i])/log(10));
+    phredq = strqual[i] - Read::quality_scale;
+    current_trimfunc += (trimq - phredq);
+    if(current_trimfunc > max_trimfunc) {
+      max_trimfunc = current_trimfunc;
+      trim_length = i;
+    }
+  }
+
+  // update untrusted
+  for(int i = untrusted.size()-1; i >= 0; i--) {
+    if(untrusted[i] > trim_length - bithash::k)
+      untrusted.pop_back();
+  }
+
+  return trim_length;
 }

@@ -14,6 +14,7 @@ extern char* fastqf;
 extern char* file_of_fastqf;
 extern int threads;
 extern unsigned int chunks_per_thread;
+extern int trimq;
 
 ////////////////////////////////////////////////////////////////////////////////
 // methods
@@ -27,4 +28,5 @@ void unzip_fastq(string & fqf);
 void zip_fastq(string fqf);
 vector<string> split(string s, char c);
 vector<string> split(string);
+int quick_trim(string strqual, vector<int> & untrusted);
 #endif

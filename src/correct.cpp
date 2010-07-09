@@ -45,7 +45,7 @@ static char* ATcutf = NULL;
 // -l
 static int trim_t = 30;
 // -t
-static int trimq = 3;
+//static int trimq = 3;
 
 // -p, number of threads
 //int threads;
@@ -438,6 +438,7 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
     
     unsigned int tchunk;
     string header,ntseq,mid,strqual,corseq;
+    int trim_length;
     char* nti;
     Read *r;
 
@@ -481,28 +482,27 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 	//cout << mid << endl;
 	getline(reads_in,strqual);
 	//cout << strqual << endl;
+
+	trim_length = quick_trim(strqual, untrusted);
 	
 	// fix error reads
 	if(untrusted.size() > 0) {
-	  r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
-	  
-	  // try to trim
-	  corseq = r->trim(trimq);
-
-	  // if still untrusted, correct
-	  if(!r->untrusted.empty())
-	    corseq = r->correct(trusted, ntnt_prob, prior_prob);
+	  r = new Read(header, &iseq[0], strqual, untrusted, trim_length);
+	  corseq = r->correct(trusted, ntnt_prob, prior_prob);
 
 	  // output read w/ trim and corrections
 	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, corseq);
 	  
 	  delete r;
 	} else {
-	  // output read as is
+	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, ntseq.substr(0,trim_length));
+	  // output read as trimmed
+	  /*
 	  if(contrail_out)
-	    reads_out << header << "\t" << ntseq << endl;
+	    reads_out << header << "\t" << ntseq.substr(0,trim_length) << endl;
 	  else
-	    reads_out << header << endl << ntseq << endl << mid << endl << strqual << endl;
+	    reads_out << header << endl << ntseq.substr(0,trim_length) << endl << mid << endl << strqual.substr(0,trim_length) << endl;
+	  */
 	}
 	
 	if(++tcount == counts[tchunk])
@@ -535,6 +535,7 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
   {    
     unsigned int tchunk;
     string header,ntseq,strqual,corseq;
+    int trim_length;
     char* nti;
     Read *r;    
     ifstream reads_in(fqf.c_str());
@@ -573,40 +574,26 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 	getline(reads_in,strqual);
 	//cout << strqual << endl;
 
-	vector<int> iqual;
-	for(int i = 0; i < strqual.size(); i++) {
-	  iqual.push_back(strqual[i]-Read::quality_scale);
-	}
-	
+	trim_length = quick_trim(strqual, untrusted);
+
 	// fix error reads
 	if(untrusted.size() > 0) {
-	  //cout << "Processing " << header;
-	  //for(int i = 0; i < untrusted.size(); i++) {
-	  //  cout << " " << untrusted[i];	  
-	  //}
-	  //cout << endl;
-	  
-	  r = new Read(header, &iseq[0], strqual, untrusted, iseq.size());
-	  
-	  // try to trim
-	  corseq = r->trim(trimq);
-	  if(!r->untrusted.empty()) {
-	    // if still untrusted, correct
-	    corseq = r->correct(trusted, ntnt_prob, prior_prob, true);
+	  // correct
+	  r = new Read(header, &iseq[0], strqual, untrusted, trim_length);
+	  corseq = r->correct(trusted, ntnt_prob, prior_prob, true);
 	    
-	    // if trimmed to long enough
-	    if(corseq.size() >= trim_t) {
-	      if(r->trusted_read != 0) { // else no guarantee there was a correction
-		for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
-		  correction cor = r->trusted_read->corrections[c];
-		  if(iseq[cor.index] < 4) {
-		    // P(obs=o|actual=a,a!=o) for Bayes
-		    ntnt_counts[iqual[cor.index]][cor.to][iseq[cor.index]]++;
-		    
-		    // P(actual=a|obs=o,a!=o)
-		    //ntnt_counts[iseq[cor.index]][cor.to]++;
-		    samples++;
-		  }
+	  // if trimmed to long enough
+	  if(corseq.size() >= trim_t) {
+	    if(r->trusted_read != 0) { // else no guarantee there was a correction
+	      for(int c = 0; c < r->trusted_read->corrections.size(); c++) {
+		correction cor = r->trusted_read->corrections[c];
+		if(iseq[cor.index] < 4) {
+		  // P(obs=o|actual=a,a!=o) for Bayes
+		  ntnt_counts[strqual[cor.index]-Read::quality_scale][cor.to][iseq[cor.index]]++;
+		  
+		  // P(actual=a|obs=o,a!=o)
+		  //ntnt_counts[iseq[cor.index]][cor.to]++;
+		  samples++;
 		}
 	      }
 	    }

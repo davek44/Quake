@@ -22,7 +22,7 @@ const static char* myopts = "r:f:t:q:l:p:h";
 // -f, file of fastq files of reads
 //char* file_of_fastqf;
 // -t
-static int trimq = 3;
+//static int trimq = 3;
 // -q
 //int Read::quality_scale;
 // -l

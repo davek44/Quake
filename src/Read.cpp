@@ -67,7 +67,8 @@ Read::~Read() {
 // trim
 //
 // Trim the end of the read the way BWA does it.
-// Returns the trimmed read as a string
+// Removes affected untrusted k-mers.
+// Returns the trimmed read as a string.
 ////////////////////////////////////////////////////////////
 string Read::trim(int t) {
   // find trim index
@@ -135,8 +136,9 @@ bool Read::single_correct(bithash *trusted, ofstream & out, double (&ntnt_prob)[
 int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash *trusted, double ntnt_prob[][4][4], double prior_prob[4], bool learning) {  
 
   unsigned int max_queue_size = 400000;
+
   /*
-  if(header == "@4844") {
+  if(header == "@1") {
     cout << "Untrusted: " << untrusted_subset.size() << endl;
     for(int i = 0; i < untrusted_subset.size(); i++)
       cout << untrusted_subset[i] << " ";
@@ -145,8 +147,8 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
     for(int i = 0; i < region.size(); i++)
       cout << region[i] << " ";
     cout << endl << endl;
-  }
-  */
+  } 
+  */ 
 
   ////////////////////////////////////////
   // region
@@ -338,13 +340,13 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
     }
 
     /*
-    if(header == "@4844") {
+    if(header == "@1") {
       cout << cr->likelihood << "\t";
       for(int c = 0; c < cr->corrections.size(); c++) {
 	cout << " (" << cr->corrections[c].index << "," << cr->corrections[c].to << ")";
       }
       cout << "\t";
-      for(int c = 0; c < trim_length-k+1; c++) {
+      for(int c = 0; c < trim_length-bithash::k+1; c++) {
 	if(cr->untrusted[c])
 	  cout << 1;
 	else
