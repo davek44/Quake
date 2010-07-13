@@ -239,7 +239,7 @@ static void trim_reads(string fqf, int pe_code, vector<streampos> & starts, vect
   }
 
   if(pe_code == 0)
-    combine_output(fqf, string("trim"));
+       combine_output(fqf, string("trim"), false);
 }
 
 
@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
 
     // combine paired end
     if(pairedend_codes[f] == 2)
-      combine_output_paired(fastqfs[f-1], fqf, string("trim"));
+	 combine_output_paired(fastqfs[f-1], fqf, string("trim"), false);
   }
 
   return 0;

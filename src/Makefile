@@ -1,6 +1,7 @@
 CC=g++
-CFLAGS=-O3 -fopenmp
-#INCLUDEDIR=/fs/szannotation/src/boost_1_42_0
+CFLAGS=-O3 -fopenmp -I/fs/szannotation/src/boost_1_42_0 -I.
+LDFLAGS=-L. -lgzstream -lz
+#INCLUDEDIR=
 EXE_FILES = correct count-kmers count-qmers reduce-kmers reduce-qmers trim build_bithash correct_stats
 .PHONY: all clean
 
@@ -10,7 +11,7 @@ clean:
 	-rm $(EXE_FILES) *.o
 
 correct: correct.cpp Read.o bithash.o edit.o
-	$(CC) $(CFLAGS) correct.cpp Read.o bithash.o edit.o -o correct
+	$(CC) $(CFLAGS) correct.cpp Read.o bithash.o edit.o -o correct $(LDFLAGS)
 
 count-kmers: count-kmers.cpp count.o
 	$(CC) $(CFLAGS) count-kmers.cpp count.o -o count-kmers
@@ -25,7 +26,7 @@ reduce-qmers: reduce-qmers.cpp
 	$(CC) $(CFLAGS) reduce-qmers.cpp -o reduce-qmers
 
 trim: trim.cpp Read.o bithash.o edit.o
-	$(CC) $(CFLAGS) trim.cpp Read.o bithash.o edit.o -o trim
+	$(CC) $(CFLAGS) trim.cpp Read.o bithash.o edit.o -o trim $(LDFLAGS)
 
 build_bithash: build_bithash.cpp bithash.o
 	$(CC) $(CFLAGS) build_bithash.cpp bithash.o -o build_bithash
@@ -44,3 +45,9 @@ bithash.o: bithash.cpp bithash.h
 
 count.o: count.cpp
 	$(CC) $(CFLAGS) -c count.cpp
+
+gzstream.o: gzstream.C gzstream.h
+	$(CC) $(CFLAGS) -c -o gzstream.o gzstream.C
+
+libgzstream.a: gzstream.o
+	ar cr libgzstream.a gzstream.o

@@ -3,6 +3,7 @@
 #include <omp.h>
 #include <iostream>
 #include <sstream>
+#include <gzstream.h>
 #include "Read.h"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -12,6 +13,9 @@
 char* fastqf = NULL;
 // -f, file of fastq files of reads
 char* file_of_fastqf = NULL;
+
+// -z, zip output files
+bool zip_output = false;
 
 // -q
 int Read::quality_scale = -1;
@@ -83,11 +87,16 @@ vector<string> split(string s, char c)
 void unzip_fastq(string & fqf) {
   char mycmd[100];
 
-  strcpy(mycmd, "gunzip ");
+  // rename
+  string fqf_zip(fqf);
+  fqf.erase(fqf.size()-3);
+
+  // unzip but leave original file
+  strcpy(mycmd, "gunzip -c ");
+  strcat(mycmd, fqf_zip.c_str());
+  strcat(mycmd, " > ");
   strcat(mycmd, fqf.c_str());
   system(mycmd);
-
-  fqf.erase(fqf.size()-3);
 }
 
 
@@ -101,11 +110,15 @@ void zip_fastq(string fqf) {
   char mycmd[100];
 
   // gzip fqf
-  strcpy(mycmd, "gzip ");
-  strcat(mycmd, fqf.c_str());
-  system(mycmd);
+  //strcpy(mycmd, "gzip ");
+  //strcat(mycmd, fqf.c_str());
+  //system(mycmd);
+
+  // remove unzipped fqf, leaving only zipped
+  remove(fqf.c_str());  
 
   // determine output file
+  /*
   string fqf_str(fqf);
   int suffix_index = fqf_str.rfind(".");
   string prefix = fqf_str.substr(0,suffix_index);
@@ -125,26 +138,17 @@ void zip_fastq(string fqf) {
     strcat(mycmd, singlef.c_str());
     system(mycmd);
   }
+  */
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// combine_output
+// combine_output_stream
 //
-// Combine output files in 'out_dir' into a single file and remove 'out_dir'
+// Combine output files in 'out_dir' into a single file defined by the given
+// stream, and remove those files along the way.
 ////////////////////////////////////////////////////////////////////////////////
-void combine_output(string fqf, string mid_ext) {  
-  // format output file
-  int suffix_index = fqf.rfind(".");
-  string prefix = fqf.substr(0,suffix_index+1);
-  string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
-  string outf = prefix + mid_ext + suffix;
-  ofstream combine_out(outf.c_str());
-
-  // format output directory
-  string path_suffix = split(fqf,'/').back();
-  string out_dir("."+path_suffix);
-
+void combine_output_stream(ostream & combine_out, string out_dir) {
   string line;
   struct stat st_file_info;
   for(int t = 0; t < threads*chunks_per_thread; t++) {
@@ -162,41 +166,45 @@ void combine_output(string fqf, string mid_ext) {
       remove(tc_file.c_str());
     }
   }
-
-  // remove output directory
-  rmdir(out_dir.c_str());
-
-  combine_out.close();
 }
 
 
-
 ////////////////////////////////////////////////////////////////////////////////
-// combine_output_paired
+// combine_output
 //
 // Combine output files in 'out_dir' into a single file and remove 'out_dir'
 ////////////////////////////////////////////////////////////////////////////////
-void combine_output_paired(string fqf1, string fqf2, string mid_ext) {
-  // format output pair file1
-  int suffix_index = fqf1.rfind(".");
-  string prefix = fqf1.substr(0,suffix_index+1);
-  string suffix = fqf1.substr(suffix_index, fqf1.size()-suffix_index);
-  string outf = prefix + mid_ext + suffix;
-  ofstream pair_out1(outf.c_str());
-  // and single file1
-  outf = prefix + mid_ext + ".single" + suffix;
-  ofstream single_out1(outf.c_str());
+void combine_output(string fqf, string mid_ext, bool zip_me) {  
+  // format output directory
+  string path_suffix = split(fqf,'/').back();
+  string out_dir("."+path_suffix);
 
-  // format output pair file2
-  suffix_index = fqf2.rfind(".");
-  prefix = fqf2.substr(0,suffix_index+1);
-  suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
-  outf = prefix + mid_ext + suffix;
-  ofstream pair_out2(outf.c_str());
-  // and single file2
-  outf = prefix + mid_ext + ".single" + suffix;
-  ofstream single_out2(outf.c_str());
+  // format output file
+  int suffix_index = fqf.rfind(".");
+  string prefix = fqf.substr(0,suffix_index+1);
+  string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
+  string outf;
+  if(zip_me) {
+    outf = prefix + mid_ext + suffix + ".gz";
+    ogzstream combine_out(outf.c_str());
+    combine_output_stream(combine_out, out_dir);
+    combine_out.close();
+  } else {
+    outf = prefix + mid_ext + suffix;
+    ofstream combine_out(outf.c_str());
+    combine_output_stream(combine_out, out_dir);
+    combine_out.close();
+  }
 
+  // remove output directory
+  rmdir(out_dir.c_str());
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// combine_output_paired_stream
+////////////////////////////////////////////////////////////////////////////////
+void combine_output_paired_stream(string fqf1, string fqf2, ostream & pair_out1, ostream & single_out1, ostream & pair_out2, ostream & single_out2) {
   // format output directories
   string path_suffix1 = split(fqf1, '/').back();
   string out_dir1("."+path_suffix1);
@@ -263,11 +271,71 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext) {
   // remove output directory
   rmdir(out_dir1.c_str());
   rmdir(out_dir2.c_str());
+}
 
-  pair_out1.close();
-  pair_out2.close();
-  single_out1.close();
-  single_out2.close();
+
+////////////////////////////////////////////////////////////////////////////////
+// combine_output_paired
+//
+// Combine output files in 'out_dir' into a single file and remove 'out_dir'
+////////////////////////////////////////////////////////////////////////////////
+void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool zip_me) {
+  if(zip_me) {
+    // format output pair file1
+    int suffix_index = fqf1.rfind(".");
+    string prefix = fqf1.substr(0,suffix_index+1);
+    string suffix = fqf1.substr(suffix_index, fqf1.size()-suffix_index);
+    string outf = prefix + mid_ext + suffix + ".gz";
+    ogzstream pair_out1(outf.c_str());
+	      
+    // and single file1
+    outf = prefix + mid_ext + ".single" + suffix + ".gz";
+    ogzstream single_out1(outf.c_str());
+    
+    // format output pair file2
+    suffix_index = fqf2.rfind(".");
+    prefix = fqf2.substr(0,suffix_index+1);
+    suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
+    outf = prefix + mid_ext + suffix + ".gz";
+    ogzstream pair_out2(outf.c_str());
+    // and single file2
+    outf = prefix + mid_ext + ".single" + suffix + ".gz";
+    ogzstream single_out2(outf.c_str());
+
+    pair_out1.close();
+    pair_out2.close();
+    single_out1.close();
+    single_out2.close();
+  
+  } else {
+    // format output pair file1
+    int suffix_index = fqf1.rfind(".");
+    string prefix = fqf1.substr(0,suffix_index+1);
+    string suffix = fqf1.substr(suffix_index, fqf1.size()-suffix_index);
+    string outf = prefix + mid_ext + suffix;
+    ofstream pair_out1(outf.c_str());
+    
+    // and single file1
+    outf = prefix + mid_ext + ".single" + suffix;
+    ofstream single_out1(outf.c_str());
+    
+    // format output pair file2
+    suffix_index = fqf2.rfind(".");
+    prefix = fqf2.substr(0,suffix_index+1);
+    suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
+    outf = prefix + mid_ext + suffix;
+    ofstream pair_out2(outf.c_str());
+    // and single file2
+    outf = prefix + mid_ext + ".single" + suffix;
+    ofstream single_out2(outf.c_str());
+
+    combine_output_paired_stream(fqf1, fqf2, pair_out1, single_out1, pair_out2, single_out2);
+    
+    pair_out1.close();
+    pair_out2.close();
+    single_out1.close();
+    single_out2.close();
+  }
 }
 
 

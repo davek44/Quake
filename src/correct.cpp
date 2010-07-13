@@ -16,7 +16,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:f:k:m:b:c:a:t:q:l:p:Cuh";
+const static char* myopts = "r:f:k:m:b:c:a:t:q:l:p:z:Cuh";
 static struct option  long_options [] = {
   {"headers", 0, 0, 1000},
   {0, 0, 0, 0}
@@ -87,6 +87,8 @@ static void  Usage
 	   " -f <file>\n"
 	   "    File containing fastq file names, one per line or\n"
 	   "    two per line for paired end reads.\n"
+	   " -z\n"
+	   "    Write output files as gzipped.\n"
 	   " -k <num>\n"
 	   "    K-mer size to correct.\n"
 	   " -m <file>\n"
@@ -139,6 +141,10 @@ static void parse_command_line(int argc, char **argv) {
 
     case 'f':
       file_of_fastqf = strdup(optarg);
+      break;
+
+    case 'z':
+      zip_output = true;
       break;
 
     case 'k':
@@ -733,21 +739,20 @@ int main(int argc, char **argv) {
     
     // combine
     if(pairedend_codes[f] == 0 || uncorrected_out) {
-      combine_output(fqf, string("cor"));
-      if(zip)
-	zip_fastq(fqf);
+      combine_output(fqf, string("cor"), zip);
     }
 
     // combine paired end
     if(pairedend_codes[f] == 2 && !uncorrected_out) {
       if(!zip) {
-	combine_output_paired(fastqfs[f-1], fqf, string("cor"));
+	combine_output_paired(fastqfs[f-1], fqf, string("cor"), zip);
       } else {
-	combine_output_paired(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3), fqf, string("cor"));
-	zip_fastq(fqf);
-	zip_fastq(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3));
+	combine_output_paired(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3), fqf, string("cor"), zip);
       }
     }
+
+    if(zip)
+      zip_fastq(fqf);
   }
 
   return 0;
