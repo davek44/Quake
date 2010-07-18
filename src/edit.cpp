@@ -404,6 +404,11 @@ void chunkify_fastq(string fqf, vector<streampos> & starts, vector<unsigned long
 // in which case we set it to 33.
 ////////////////////////////////////////////////////////////
 void guess_quality_scale(string fqf) {
+  // unzip (happens twice, but oh well)
+  if(fqf.substr(fqf.size()-3) == ".gz") {
+    unzip_fastq(fqf);
+  }
+
   string header, seq, mid, strqual;
   int reads_to_check = 1000;
   int reads_checked = 0;

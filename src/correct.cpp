@@ -16,7 +16,7 @@
 ////////////////////////////////////////////////////////////
 // options
 ////////////////////////////////////////////////////////////
-const static char* myopts = "r:f:k:m:b:c:a:t:q:l:p:z:Cuh";
+const static char* myopts = "r:f:k:m:b:c:a:t:q:l:p:zCuh";
 static struct option  long_options [] = {
   {"headers", 0, 0, 1000},
   {0, 0, 0, 0}
@@ -733,6 +733,7 @@ int main(int argc, char **argv) {
 	    ntnt_prob[q][i][j] = 1.0/3.0;
 
     learn_errors(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
+    //cerr << "NOT LEARNING ERROR RATES!!!" << endl;
 
     // correct
     correct_reads(fqf, pairedend_codes[f], trusted, starts, counts, ntnt_prob, prior_prob);
