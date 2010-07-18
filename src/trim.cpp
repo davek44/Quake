@@ -47,9 +47,7 @@ static void  Usage(char * command)
   fprintf (stderr,
            "USAGE:  trim [options]\n"
            "\n"
-           "Trims reads in a fastq file.  This program will shuffle the\n"
-	   "sequences.  If there is demand for a version that maintains\n"
-	   "the order, I can fix that - dakelley@umiacs.umd.edu\n"
+           "Trims reads in a fastq file.\n"
            "\n"
 	   "Options:\n"
 	   " -r <file>\n"
