@@ -62,7 +62,7 @@ static bool uncorrected_out = false;
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
-#define TESTING false
+#define TESTING true
 static const char* nts = "ACGTN";
 static const unsigned int max_qual = 50;
 //unsigned int chunks_per_thread = 200;
@@ -429,9 +429,8 @@ static void output_read(ofstream & reads_out, int pe_code, string header, string
     tstats.removed++;
     if(uncorrected_out || pe_code > 0) {
       // update header
-      //if(!uncorrected_out && !orig_headers && pe_code > 0)
-      if(!uncorrected_out && pe_code > 0)
-	header += " error";
+      header += " error";
+
       //print
       if(contrail_out)
 	reads_out << header << "\t" << ntseq << endl;
@@ -785,23 +784,23 @@ int main(int argc, char **argv) {
 	  if(i != j)
 	    ntnt_prob[q][i][j] = 1.0/3.0;
 
-    learn_errors(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
-    //cerr << "NOT LEARNING ERROR RATES!!!" << endl;
+    if(!TESTING)
+      learn_errors(fqf, trusted, starts, counts, ntnt_prob, prior_prob);
 
     // correct
     correct_reads(fqf, pairedend_codes[f], trusted, starts, counts, ntnt_prob, prior_prob);
     
     // combine
-    if(pairedend_codes[f] == 0 || uncorrected_out) {
-      combine_output(fqf, string("cor"), zip);
+    if(pairedend_codes[f] == 0) {
+      combine_output(fqf, string("cor"), uncorrected_out, zip);
     }
 
     // combine paired end
-    if(pairedend_codes[f] == 2 && !uncorrected_out) {
+    if(pairedend_codes[f] == 2) {
       if(!zip) {
-	combine_output_paired(fastqfs[f-1], fqf, string("cor"), zip);
+	combine_output_paired(fastqfs[f-1], fqf, string("cor"), uncorrected_out, zip);
       } else {
-	combine_output_paired(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3), fqf, string("cor"), zip);
+	combine_output_paired(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3), fqf, string("cor"), uncorrected_out, zip);
       }
     }
 

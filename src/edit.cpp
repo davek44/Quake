@@ -148,8 +148,8 @@ void zip_fastq(string fqf) {
 // Combine output files in 'out_dir' into a single file defined by the given
 // stream, and remove those files along the way.
 ////////////////////////////////////////////////////////////////////////////////
-void combine_output_stream(ostream & combine_out, string out_dir) {
-  string line;
+void combine_output_stream(ostream & combine_out, ostream & err_out, string out_dir) {
+  string header, seq, mid, qual;
   struct stat st_file_info;
   for(int t = 0; t < threads*chunks_per_thread; t++) {
     string tc_file(out_dir+"/");
@@ -160,8 +160,16 @@ void combine_output_stream(ostream & combine_out, string out_dir) {
     // if file exists, add to single output
     if(stat(tc_file.c_str(), &st_file_info) == 0) {
       ifstream tc_out(tc_file.c_str());
-      while(getline(tc_out, line))
-	combine_out << line << endl;
+      while(getline(tc_out, header)) {
+	getline(tc_out, seq);
+	getline(tc_out, mid);
+	getline(tc_out, qual);
+
+	if(!err_out.good() || header.find("error") == -1)
+	  combine_out << header << endl << seq << endl << mid << endl << qual << endl;
+	else
+	  err_out << header.substr(0,header.find("error")) << endl << seq << endl << mid << endl << qual << endl;
+      }
       tc_out.close();
       remove(tc_file.c_str());
     }
@@ -174,7 +182,7 @@ void combine_output_stream(ostream & combine_out, string out_dir) {
 //
 // Combine output files in 'out_dir' into a single file and remove 'out_dir'
 ////////////////////////////////////////////////////////////////////////////////
-void combine_output(string fqf, string mid_ext, bool zip_me) {  
+void combine_output(string fqf, string mid_ext, bool uncorrected_out, bool zip_me) {
   // format output directory
   string path_suffix = split(fqf,'/').back();
   string out_dir("."+path_suffix);
@@ -184,16 +192,29 @@ void combine_output(string fqf, string mid_ext, bool zip_me) {
   string prefix = fqf.substr(0,suffix_index+1);
   string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
   string outf;
+  string errf;
   if(zip_me) {
     outf = prefix + mid_ext + suffix + ".gz";
-    ogzstream combine_out(outf.c_str());
-    combine_output_stream(combine_out, out_dir);
+    ogzstream combine_out(outf.c_str());    
+    ogzstream err_out;
+    if(uncorrected_out) {
+      errf = prefix + mid_ext + ".err" + suffix + ".gz";
+      err_out.open(errf.c_str());
+    }
+    combine_output_stream(combine_out, err_out, out_dir);
     combine_out.close();
+    err_out.close();
   } else {
     outf = prefix + mid_ext + suffix;
     ofstream combine_out(outf.c_str());
-    combine_output_stream(combine_out, out_dir);
+    ofstream err_out;
+    if(uncorrected_out) {
+      errf = prefix + mid_ext + ".err" + suffix;
+      err_out.open(errf.c_str());
+    }
+    combine_output_stream(combine_out, err_out, out_dir);
     combine_out.close();
+    err_out.close();
   }
 
   // remove output directory
@@ -279,7 +300,7 @@ void combine_output_paired_stream(string fqf1, string fqf2, ostream & pair_out1,
 //
 // Combine output files in 'out_dir' into a single file and remove 'out_dir'
 ////////////////////////////////////////////////////////////////////////////////
-void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool zip_me) {
+void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorrected_out, bool zip_me) {
   if(zip_me) {
     // format output pair file1
     int suffix_index = fqf1.rfind(".");
