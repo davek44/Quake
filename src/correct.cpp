@@ -66,6 +66,22 @@ static const char* nts = "ACGTN";
 static const unsigned int max_qual = 50;
 //unsigned int chunks_per_thread = 200;
 
+ // to collect stats
+struct stats {
+  stats() {
+    validated = 0;
+    corrected = 0;
+    removed = 0;
+    trimmed = 0;
+    trimmed_only = 0;
+  }
+  unsigned long long validated;
+  unsigned long long corrected;
+  unsigned long long removed;
+  unsigned long long trimmed;
+  unsigned long long trimmed_only;
+};
+
 static void  Usage
     (char * command)
 
@@ -370,7 +386,7 @@ void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max
 // Output the given possibly corrected and/or trimmed
 // read according to the given options.
 ////////////////////////////////////////////////////////////////////////////////
-static void output_read(ofstream & reads_out, int pe_code, string header, string ntseq, string mid, string strqual, string corseq) {
+static void output_read(ofstream & reads_out, int pe_code, string header, string ntseq, string mid, string strqual, string corseq, stats & tstats) {
   if(corseq.size() >= trim_t) {
     // check for changes
     bool corrected = false;
@@ -381,6 +397,9 @@ static void output_read(ofstream & reads_out, int pe_code, string header, string
 	strqual[i] = (char)(Read::quality_scale+2);
       }
     }
+    if(corrected)
+      tstats.corrected++;
+
     // update header
     if(!orig_headers) {
       if(corrected)
@@ -390,6 +409,12 @@ static void output_read(ofstream & reads_out, int pe_code, string header, string
 	stringstream trim_inter;
 	trim_inter << trimlen;
 	header += " trim=" + trim_inter.str();
+	tstats.trimmed++;
+	if(!corrected)
+	  tstats.trimmed_only++;
+      } else {
+	if(!corrected)
+	  tstats.validated++;
       }
     }
     // print
@@ -400,6 +425,7 @@ static void output_read(ofstream & reads_out, int pe_code, string header, string
     if(TESTING)
       cerr << header << "\t" << ntseq << "\t" << corseq << endl;
   } else {
+    tstats.removed++;
     if(uncorrected_out || pe_code > 0) {
       // update header
       //if(!uncorrected_out && !orig_headers && pe_code > 0)
@@ -433,6 +459,9 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
   string path_suffix = split(fqf,'/').back();
   string out_dir("."+path_suffix);
   mkdir(out_dir.c_str(), S_IRWXU);
+
+  // collect stats
+  stats * thread_stats = new stats[omp_get_max_threads()];
 
   unsigned int chunk = 0;
 #pragma omp parallel //shared(trusted)
@@ -497,11 +526,11 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 	  corseq = r->correct(trusted, ntnt_prob, prior_prob);
 
 	  // output read w/ trim and corrections
-	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, corseq);
+	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, corseq, thread_stats[tid]);
 	  
 	  delete r;
 	} else {
-	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, ntseq.substr(0,trim_length));
+	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, ntseq.substr(0,trim_length), thread_stats[tid]);
 	  // output read as trimmed
 	  /*
 	  if(contrail_out)
@@ -521,6 +550,26 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
     }
     reads_in.close();
   }
+
+  // combine stats
+  for(int i = 1; i < omp_get_max_threads(); i++) {
+    thread_stats[0].validated += thread_stats[i].validated;
+    thread_stats[0].corrected += thread_stats[i].corrected;
+    thread_stats[0].trimmed += thread_stats[i].trimmed;
+    thread_stats[0].trimmed_only += thread_stats[i].trimmed_only;
+    thread_stats[0].removed += thread_stats[i].removed;
+  }
+
+  // print stats
+  int suffix_index = fqf.rfind(".");
+  string outf = fqf.substr(0,suffix_index+1) + "stats.txt";
+  ofstream stats_out(outf.c_str());
+  stats_out << "Validated: " << thread_stats[0].validated << endl;
+  stats_out << "Corrected: " << thread_stats[0].corrected << endl;
+  stats_out << "Trimmed: " << thread_stats[0].trimmed << endl;
+  stats_out << "Trimmed only: " << thread_stats[0].trimmed_only << endl;
+  stats_out << "Removed: " << thread_stats[0].removed << endl;
+  stats_out.close();
 }
 
 
