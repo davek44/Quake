@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <sys/stat.h>
+#include <gzstream.h>
 
 ////////////////////////////////////////////////////////////
 // options
@@ -109,7 +110,7 @@ static void  Usage
 	   "    K-mer size to correct.\n"
 	   " -m <file>\n"
 	   "    File containing kmer counts in format `seq\tcount`.\n"
-	   "    Can also be piped in with '-'\n"
+	   "    Can be gzipped.\n"
 	   " -b <file>\n"
 	   "    File containing saved bithash.\n"
 	   " -c <num>\n"
@@ -710,16 +711,19 @@ int main(int argc, char **argv) {
 
   // get kmer counts
   if(merf != NULL) {
+    string merf_str(merf);
     if(ATcutf != NULL) {
-      if(strcmp(merf,"-") == 0)
-	trusted->tab_file_load(cin, load_AT_cutoffs(), atgc);
-      else {
+      if(merf_str.substr(merf_str.size()-3) == ".gz") {
+	igzstream mer_in(merf);
+	trusted->tab_file_load(mer_in, load_AT_cutoffs(), atgc);
+      } else {
 	ifstream mer_in(merf);
 	trusted->tab_file_load(mer_in, load_AT_cutoffs(), atgc);
       }
     } else {
-      if(strcmp(merf,"-") == 0) {
-	trusted->tab_file_load(cin, cutoff, atgc);
+      if(merf_str.substr(merf_str.size()-3) == ".gz") {
+	igzstream mer_in(merf);
+	trusted->tab_file_load(mer_in, cutoff, atgc);
       } else {
 	ifstream mer_in(merf);
 	trusted->tab_file_load(mer_in, cutoff, atgc);
