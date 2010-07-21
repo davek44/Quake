@@ -320,16 +320,16 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     ogzstream pair_out1(outf.c_str());
 	      
     // and single file1
-    outf = prefix + mid_ext + ".single" + suffix + ".gz";
+    outf = prefix + mid_ext + "_single" + suffix + ".gz";
     ogzstream single_out1(outf.c_str());
 
     // and error file1
     ogzstream single_err_out1;
     ogzstream err_out1;
     if(uncorrected_out) {
-      outf = prefix + mid_ext + ".single_err" + suffix + ".gz";
+      outf = prefix + "err_single" + suffix + ".gz";
       single_err_out1.open(outf.c_str());
-      outf = prefix + mid_ext + ".err" + suffix + ".gz";
+      outf = prefix + "err" + suffix + ".gz";
       err_out1.open(outf.c_str());
     }
     
@@ -341,16 +341,16 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     ogzstream pair_out2(outf.c_str());
 
     // and single file2
-    outf = prefix + mid_ext + ".single" + suffix + ".gz";
+    outf = prefix + mid_ext + "_single" + suffix + ".gz";
     ogzstream single_out2(outf.c_str());    
 
     // and error file1
     ogzstream single_err_out2;
     ogzstream err_out2;
     if(uncorrected_out) {
-      outf = prefix + mid_ext + ".single_err" + suffix + ".gz";
+      outf = prefix + "err_single" + suffix + ".gz";
       single_err_out2.open(outf.c_str());
-      outf = prefix + mid_ext + ".err" + suffix + ".gz";
+      outf = prefix + "err" + suffix + ".gz";
       err_out2.open(outf.c_str());
     }
 
@@ -370,16 +370,16 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     ofstream pair_out1(outf.c_str());
     
     // and single file1
-    outf = prefix + mid_ext + ".single" + suffix;
+    outf = prefix + mid_ext + "_single" + suffix;
     ofstream single_out1(outf.c_str());
 
     // and error file1
     ofstream single_err_out1;
     ofstream err_out1;
     if(uncorrected_out) {
-      outf = prefix + mid_ext + ".single_err" + suffix;
+      outf = prefix + "err_single" + suffix;
       single_err_out1.open(outf.c_str());
-      outf = prefix + mid_ext + ".err" + suffix;
+      outf = prefix + "err" + suffix;
       err_out1.open(outf.c_str());
     }
     
@@ -391,16 +391,16 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     ofstream pair_out2(outf.c_str());
 
     // and single file2
-    outf = prefix + mid_ext + ".single" + suffix;
+    outf = prefix + mid_ext + "_single" + suffix;
     ofstream single_out2(outf.c_str());
 
     // and error file2
     ofstream single_err_out2;
     ofstream err_out2;    
     if(uncorrected_out) {
-      outf = prefix + mid_ext + ".single_err" + suffix;
+      outf = prefix + "err_single" + suffix;
       single_err_out2.open(outf.c_str());
-      outf = prefix + mid_ext + ".err" + suffix;
+      outf = prefix + "err" + suffix;
       err_out2.open(outf.c_str());
     }
 
