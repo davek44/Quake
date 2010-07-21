@@ -65,7 +65,7 @@ static bool uncorrected_out = false;
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
-#define TESTING true
+#define TESTING false
 static const char* nts = "ACGTN";
 static const unsigned int max_qual = 50;
 //unsigned int chunks_per_thread = 200;
