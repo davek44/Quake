@@ -182,7 +182,7 @@ void combine_output_stream(ostream & combine_out, ostream & err_out, string out_
 //
 // Combine output files in 'out_dir' into a single file and remove 'out_dir'
 ////////////////////////////////////////////////////////////////////////////////
-void combine_output(string fqf, string mid_ext, bool uncorrected_out, bool zip_me) {
+void combine_output(string fqf, string mid_ext, bool uncorrected_out) {
   // format output directory
   string path_suffix = split(fqf,'/').back();
   string out_dir("."+path_suffix);
@@ -193,7 +193,7 @@ void combine_output(string fqf, string mid_ext, bool uncorrected_out, bool zip_m
   string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
   string outf;
   string errf;
-  if(zip_me) {
+  if(zip_output) {
     outf = prefix + mid_ext + suffix + ".gz";
     ogzstream combine_out(outf.c_str());    
     ogzstream err_out;
@@ -300,8 +300,8 @@ void combine_output_paired_stream(string fqf1, string fqf2, ostream & pair_out1,
 //
 // Combine output files in 'out_dir' into a single file and remove 'out_dir'
 ////////////////////////////////////////////////////////////////////////////////
-void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorrected_out, bool zip_me) {
-  if(zip_me) {
+void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorrected_out) {
+  if(zip_output) {
     // format output pair file1
     int suffix_index = fqf1.rfind(".");
     string prefix = fqf1.substr(0,suffix_index+1);
@@ -322,6 +322,8 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     // and single file2
     outf = prefix + mid_ext + ".single" + suffix + ".gz";
     ogzstream single_out2(outf.c_str());
+
+    combine_output_paired_stream(fqf1, fqf2, pair_out1, single_out1, pair_out2, single_out2);
 
     pair_out1.close();
     pair_out2.close();

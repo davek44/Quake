@@ -28,6 +28,9 @@ static struct option  long_options [] = {
 // -f, file of fastq files of reads
 //char* file_of_fastqf;
 
+// -z, zip output files
+//bool zip_output = false;
+
 // -k, kmer size
 static int k = 0;
 
@@ -792,15 +795,15 @@ int main(int argc, char **argv) {
     
     // combine
     if(pairedend_codes[f] == 0) {
-      combine_output(fqf, string("cor"), uncorrected_out, zip);
+      combine_output(fqf, string("cor"), uncorrected_out);
     }
 
     // combine paired end
     if(pairedend_codes[f] == 2) {
       if(!zip) {
-	combine_output_paired(fastqfs[f-1], fqf, string("cor"), uncorrected_out, zip);
+	combine_output_paired(fastqfs[f-1], fqf, string("cor"), uncorrected_out);
       } else {
-	combine_output_paired(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3), fqf, string("cor"), uncorrected_out, zip);
+	combine_output_paired(fastqfs[f-1].substr(0,fastqfs[f-1].size()-3), fqf, string("cor"), uncorrected_out);
       }
     }
 
