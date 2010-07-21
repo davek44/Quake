@@ -225,7 +225,7 @@ void combine_output(string fqf, string mid_ext, bool uncorrected_out) {
 ////////////////////////////////////////////////////////////////////////////////
 // combine_output_paired_stream
 ////////////////////////////////////////////////////////////////////////////////
-void combine_output_paired_stream(string fqf1, string fqf2, ostream & pair_out1, ostream & single_out1, ostream & pair_out2, ostream & single_out2) {
+void combine_output_paired_stream(string fqf1, string fqf2, ostream & pair_out1, ostream & single_out1, ostream & single_err_out1, ostream & err_out1, ostream & pair_out2, ostream & single_out2, ostream & single_err_out2, ostream & err_out2) {
   // format output directories
   string path_suffix1 = split(fqf1, '/').back();
   string out_dir1("."+path_suffix1);
@@ -274,11 +274,21 @@ void combine_output_paired_stream(string fqf1, string fqf2, ostream & pair_out1,
 	  } else {
 	    // error in 2	    
 	    single_out1 << header1 << endl << seq1 << endl << mid1 << endl << qual1 << endl;
+	    if(single_err_out2.good())
+	      single_err_out2 << header2.substr(0,header2.find("error")) << endl << seq2 << endl << mid2 << endl << qual2 << endl;
 	  }
 	} else {
 	  if(header2.find("error") == -1) {
 	    // error in 1
+	    if(single_err_out1.good())
+	      single_err_out1 << header1.substr(0,header1.find("error")) << endl << seq1 << endl << mid1 << endl << qual1 << endl;
 	    single_out2 << header2 << endl << seq2 << endl << mid2 << endl << qual2 << endl;
+	  } else {
+	    // error in 1,2
+	    if(err_out1.good()) {
+	      err_out1 << header1.substr(0,header1.find("error")) << endl << seq1 << endl << mid1 << endl << qual1 << endl;
+	      err_out2 << header2.substr(0,header2.find("error")) << endl << seq2 << endl << mid2 << endl << qual2 << endl;
+	    }
 	  }
 	}
       }
@@ -312,6 +322,16 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     // and single file1
     outf = prefix + mid_ext + ".single" + suffix + ".gz";
     ogzstream single_out1(outf.c_str());
+
+    // and error file1
+    ogzstream single_err_out1;
+    ogzstream err_out1;
+    if(uncorrected_out) {
+      outf = prefix + mid_ext + ".single_err" + suffix + ".gz";
+      single_err_out1.open(outf.c_str());
+      outf = prefix + mid_ext + ".err" + suffix + ".gz";
+      err_out1.open(outf.c_str());
+    }
     
     // format output pair file2
     suffix_index = fqf2.rfind(".");
@@ -319,11 +339,22 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
     outf = prefix + mid_ext + suffix + ".gz";
     ogzstream pair_out2(outf.c_str());
+
     // and single file2
     outf = prefix + mid_ext + ".single" + suffix + ".gz";
-    ogzstream single_out2(outf.c_str());
+    ogzstream single_out2(outf.c_str());    
 
-    combine_output_paired_stream(fqf1, fqf2, pair_out1, single_out1, pair_out2, single_out2);
+    // and error file1
+    ogzstream single_err_out2;
+    ogzstream err_out2;
+    if(uncorrected_out) {
+      outf = prefix + mid_ext + ".single_err" + suffix + ".gz";
+      single_err_out2.open(outf.c_str());
+      outf = prefix + mid_ext + ".err" + suffix + ".gz";
+      err_out2.open(outf.c_str());
+    }
+
+    combine_output_paired_stream(fqf1, fqf2, pair_out1, single_out1, single_err_out1, err_out1, pair_out2, single_out2, single_err_out2, err_out2);
 
     pair_out1.close();
     pair_out2.close();
@@ -341,6 +372,16 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     // and single file1
     outf = prefix + mid_ext + ".single" + suffix;
     ofstream single_out1(outf.c_str());
+
+    // and error file1
+    ofstream single_err_out1;
+    ofstream err_out1;
+    if(uncorrected_out) {
+      outf = prefix + mid_ext + ".single_err" + suffix;
+      single_err_out1.open(outf.c_str());
+      outf = prefix + mid_ext + ".err" + suffix;
+      err_out1.open(outf.c_str());
+    }
     
     // format output pair file2
     suffix_index = fqf2.rfind(".");
@@ -348,11 +389,22 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
     outf = prefix + mid_ext + suffix;
     ofstream pair_out2(outf.c_str());
+
     // and single file2
     outf = prefix + mid_ext + ".single" + suffix;
     ofstream single_out2(outf.c_str());
 
-    combine_output_paired_stream(fqf1, fqf2, pair_out1, single_out1, pair_out2, single_out2);
+    // and error file2
+    ofstream single_err_out2;
+    ofstream err_out2;    
+    if(uncorrected_out) {
+      outf = prefix + mid_ext + ".single_err" + suffix;
+      single_err_out2.open(outf.c_str());
+      outf = prefix + mid_ext + ".err" + suffix;
+      err_out2.open(outf.c_str());
+    }
+
+    combine_output_paired_stream(fqf1, fqf2, pair_out1, single_out1, single_err_out1, err_out1, pair_out2, single_out2, single_err_out2, err_out2);
     
     pair_out1.close();
     pair_out2.close();
