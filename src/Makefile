@@ -10,7 +10,7 @@ all: $(EXE_FILES)
 clean:
 	-rm $(EXE_FILES) *.o
 
-correct: correct.cpp Read.o bithash.o edit.o
+correct: correct.cpp Read.o bithash.o edit.o libgzstream.a
 	$(CC) $(CFLAGS) correct.cpp Read.o bithash.o edit.o -o correct $(LDFLAGS)
 
 count-kmers: count-kmers.cpp count.o
@@ -25,7 +25,7 @@ reduce-kmers: reduce-kmers.cpp
 reduce-qmers: reduce-qmers.cpp
 	$(CC) $(CFLAGS) reduce-qmers.cpp -o reduce-qmers
 
-trim: trim.cpp Read.o bithash.o edit.o
+trim: trim.cpp Read.o bithash.o edit.o libgzstream.a
 	$(CC) $(CFLAGS) trim.cpp Read.o bithash.o edit.o -o trim $(LDFLAGS)
 
 build_bithash: build_bithash.cpp bithash.o
