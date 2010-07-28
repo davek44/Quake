@@ -85,7 +85,7 @@ vector<string> split(string s, char c)
 // Unzip read file and remove ".gz" suffix from 'fqf'.
 ////////////////////////////////////////////////////////////////////////////////
 void unzip_fastq(string & fqf) {
-  char mycmd[100];
+  char mycmd[500];
 
   // rename
   string fqf_zip(fqf);
@@ -477,15 +477,12 @@ void chunkify_fastq(string fqf, vector<streampos> & starts, vector<unsigned long
 // Guess at ascii scale of quality values by examining
 // a bunch of reads and looking for quality values < 64,
 // in which case we set it to 33.
+//
+// Assuming the file is unzipped.
 ////////////////////////////////////////////////////////////
 void guess_quality_scale(string fqf) {
-  // unzip (happens twice, but oh well)
-  if(fqf.substr(fqf.size()-3) == ".gz") {
-    unzip_fastq(fqf);
-  }
-
   string header, seq, mid, strqual;
-  int reads_to_check = 1000;
+  int reads_to_check = 10000;
   int reads_checked = 0;
   ifstream reads_in(fqf.c_str());
   while(getline(reads_in, header)) {

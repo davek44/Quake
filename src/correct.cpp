@@ -757,10 +757,6 @@ int main(int argc, char **argv) {
   vector<int> pairedend_codes;
   parse_fastq(fastqfs, pairedend_codes);
 
-  // determine quality value scale
-  if(Read::quality_scale == -1)
-    guess_quality_scale(fastqfs[0]);
-
   // process each file
   string fqf;
   bool zip;
@@ -774,6 +770,11 @@ int main(int argc, char **argv) {
       unzip_fastq(fqf);
     } else
       zip = false;
+
+    // determine quality value scale
+    if(Read::quality_scale == -1)
+     guess_quality_scale(fqf);
+
 
     // split file
     vector<streampos> starts;
