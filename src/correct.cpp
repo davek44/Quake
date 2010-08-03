@@ -20,6 +20,7 @@
 const static char* myopts = "r:f:k:m:b:c:a:t:q:l:p:zCuh";
 static struct option  long_options [] = {
   {"headers", 0, 0, 1000},
+  {"log", 0, 0, 1001},
   {0, 0, 0, 0}
 };
 
@@ -61,6 +62,8 @@ static bool orig_headers = false;
 static bool contrail_out = false;
 // -u, output uncorrected reads
 static bool uncorrected_out = false;
+// --log, output correction log
+static bool out_log = false;
 
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
@@ -137,6 +140,9 @@ static void  Usage
 	   " --headers\n"
 	   "    Output only the original read headers without\n"
 	   "    correction messages\n"
+	   " --log\n"
+	   "    Output a log of all corrections into *.log as\n"
+	   "    'quality position new_nt old_nt'\n"
            "\n");
 
    return;
@@ -238,6 +244,10 @@ static void parse_command_line(int argc, char **argv) {
 
     case 1000:
       orig_headers = true;
+      break;
+
+    case 1001:
+      out_log = true;
       break;
 
     case 'h':
@@ -391,12 +401,16 @@ void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max
 // Output the given possibly corrected and/or trimmed
 // read according to the given options.
 ////////////////////////////////////////////////////////////////////////////////
-static void output_read(ofstream & reads_out, int pe_code, string header, string ntseq, string mid, string strqual, string corseq, stats & tstats) {
+static void output_read(ofstream & reads_out, ofstream & corlog_out, int pe_code, string header, string ntseq, string mid, string strqual, string corseq, stats & tstats) {
   if(corseq.size() >= trim_t) {
     // check for changes
     bool corrected = false;
     for(int i = 0; i < corseq.size(); i++) {
       if(corseq[i] != ntseq[i]) {
+	// log it
+	if(corlog_out.good())
+	  corlog_out << (strqual[i]-Read::quality_scale) << "\t" << (i+1) << "\t" << corseq[i] << "\t" << ntseq[i] << endl;
+	// note it
 	corrected = true;
 	// set qual to crap
 	strqual[i] = (char)(Read::quality_scale+2);
@@ -494,6 +508,13 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
       toutf += tconvert.str();
       ofstream reads_out(toutf.c_str());
 
+      // output log
+      string tlogf = toutf + ".log";
+      ofstream corlog_out;
+      if(out_log) {
+	corlog_out.open(tlogf.c_str());
+      }
+
       unsigned long long tcount = 0;
       while(getline(reads_in, header)) {
 	//cout << tid << " " << header << endl;
@@ -530,11 +551,11 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 	  corseq = r->correct(trusted, ntnt_prob, prior_prob);
 
 	  // output read w/ trim and corrections
-	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, corseq, thread_stats[tid]);
+	  output_read(reads_out, corlog_out, pe_code, header, ntseq, mid, strqual, corseq, thread_stats[tid]);
 	  
 	  delete r;
 	} else {
-	  output_read(reads_out, pe_code, header, ntseq, mid, strqual, ntseq.substr(0,trim_length), thread_stats[tid]);
+	  output_read(reads_out, corlog_out, pe_code, header, ntseq, mid, strqual, ntseq.substr(0,trim_length), thread_stats[tid]);
 	  // output read as trimmed
 	  /*
 	  if(contrail_out)
