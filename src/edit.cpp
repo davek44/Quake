@@ -237,7 +237,7 @@ void combine_output(string fqf, string mid_ext, bool uncorrected_out) {
     ogzstream combine_out(outf.c_str());    
     ogzstream err_out;
     if(uncorrected_out) {
-      errf = prefix + mid_ext + ".err" + suffix + ".gz";
+      errf = prefix + "err" + suffix + ".gz";
       err_out.open(errf.c_str());
     }
     combine_output_stream(combine_out, err_out, out_dir);
@@ -249,7 +249,7 @@ void combine_output(string fqf, string mid_ext, bool uncorrected_out) {
     ofstream combine_out(outf.c_str());
     ofstream err_out;
     if(uncorrected_out) {
-      errf = prefix + mid_ext + ".err" + suffix;
+      errf = prefix + "err" + suffix;
       err_out.open(errf.c_str());
     }
     combine_output_stream(combine_out, err_out, out_dir);
