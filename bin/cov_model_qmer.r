@@ -162,7 +162,7 @@ cutoff = function(p) {
       ratio.best = r
       cov.best = c
     }
-    cat(c," ",ratios(c,p),"\n")
+    #cat(c," ",ratios(c,p),"\n")
   }
   return(cov.best)
 }
