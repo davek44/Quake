@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from optparse import OptionParser
-import os, random
+import os, random, quake
 
 ############################################################
 # cov_model.py
