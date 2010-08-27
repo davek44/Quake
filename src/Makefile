@@ -2,7 +2,7 @@ CC=g++
 CFLAGS=-O3 -fopenmp -I/fs/szannotation/src/boost_1_42_0 -I.
 LDFLAGS=-L. -lgzstream -lz
 #INCLUDEDIR=
-EXE_FILES = correct count-kmers count-qmers reduce-kmers reduce-qmers trim build_bithash correct_stats
+EXE_FILES = correct count-kmers count-qmers count_qmers reduce-kmers reduce-qmers trim build_bithash correct_stats
 .PHONY: all clean
 
 all: $(EXE_FILES)
@@ -18,6 +18,12 @@ count-kmers: count-kmers.cpp count.o
 
 count-qmers: count-qmers.cpp count.o
 	$(CC) $(CFLAGS) count-qmers.cpp count.o -o count-qmers
+
+count_qmers: count_qmers.cpp count.o qmer_hash.o
+	$(CC) $(CFLAGS) -o count_qmers count_qmers.cpp count.o qmer_hash.o
+
+qmer_hash.o: qmer_hash.cpp qmer_hash.h
+	$(CC) $(CFLAGS) -c qmer_hash.cpp
 
 reduce-kmers: reduce-kmers.cpp
 	$(CC) $(CFLAGS) reduce-kmers.cpp -o reduce-kmers

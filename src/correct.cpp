@@ -796,7 +796,6 @@ int main(int argc, char **argv) {
     if(Read::quality_scale == -1)
      guess_quality_scale(fqf);
 
-
     // split file
     vector<streampos> starts;
     vector<unsigned long long> counts;
