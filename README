@@ -13,3 +13,12 @@ Quake is freely available from http://www.cbcb.umd.edu/software/quake , and a
 manuscript is under preparation. Instructions on how to use Quake can be found
 at http://www.cbcb.umd.edu/software/quake/manual.html .  Direct questions,
 concerns, and feature requests to David Kelley (dakelley@umiacs.umd.edu).
+
+Installation prerequisites:
+1. Download and install Boost: http://www.boost.org
+2. Open src/Makefile and update CFLAGS to include Boost.  E.g. if you used MacPorts, it may be:
+CFLAGS=-O3 -fopenmp -I/opt/local/include -I.
+3. Download and install R: http://www.r-project.org
+4. Download and install R VGAM library via R command install.packages("VGAM")
+
+Both Boost and R are easily installed via an installation helper e.g. MacPorts (http://www.macports.org) for Mac, and a command such as "sudo port install boost".
