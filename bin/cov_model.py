@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from optparse import OptionParser
+from optparse import OptionParser, SUPPRESS_HELP
 import os, random, quake
 
 ############################################################
@@ -16,9 +16,10 @@ def main():
     usage = 'usage: %prog [options] <counts file>'
     parser = OptionParser(usage)
     parser.add_option('--int', dest='counted_kmers', action='store_true', default=False, help='Kmers were counted as integers w/o the use of quality values [default: %default]')
-    parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help='Model kmer coverage as a function of GC content of kmers [default: %default]')
     parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff [default: %default]')
     parser.add_option('--no_sample', dest='no_sample', action='store_true', default=False, help='Do not sample kmer coverages into kmers.txt because its already done [default: %default]')
+    # help='Model kmer coverage as a function of GC content of kmers [default: %default]'
+    parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help=SUPPRESS_HELP)
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
@@ -62,7 +63,7 @@ def model_cutoff(ctsf, ratio):
             print >> cov_out, '%d\t%d' % (cov+1,kmer_hist[cov])
     cov_out.close()
 
-    os.system('R --slave --args %d < %s/cov_model.r 2> r.log' % (ratio,quake.r_dir))
+    os.system('R --slave --args %d < %s/cov_model.r 2> r.log' % (ratio,quake.quake_dir))
 
 
 ############################################################
@@ -112,7 +113,7 @@ def model_q_cutoff(ctsf, sample, ratio, no_sample=False):
             kmer_i += 1
         out.close()
 
-    os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,quake.r_dir))
+    os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,quake.quake_dir))
 
 
 ############################################################
@@ -154,7 +155,7 @@ def model_q_gc_cutoffs(ctsf, sample, ratio):
                 kmer_i += 1
         out.close()
         
-        os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,r_dir,at))
+        os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,quake.quake_dir,at))
 
         at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
         if at in [1,k-1]:   # setting extremes to next closests
@@ -207,7 +208,7 @@ def model_q_gc_cutoffs_bigmem(ctsf, sample, ratio):
             print >> out, rc
         out.close()
 
-        os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,r_dir,at))
+        os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,quake.quake_dir,at))
 
         at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
         if at in [1,k-1]:   # setting extremes to next closests

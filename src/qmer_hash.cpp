@@ -167,6 +167,7 @@ void qmer_hash::ull_to_char(char* kmer_char, unsigned long long kmer_ull) {
 ////////////////////////////////////////////////////////////////////////////////
 void qmer_hash::clear() {
      memset(table, 0, size);
+     elements = 0;
 }
 
 

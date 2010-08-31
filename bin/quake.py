@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-from optparse import OptionParser
-import os, random
+from optparse import OptionParser, SUPPRESS_HELP
+import os, random, sys
 import cov_model
 
 ############################################################
@@ -10,7 +10,8 @@ import cov_model
 # reads.
 ############################################################
 
-r_dir = '/nfshomes/dakelley/research/error_correction/bin'
+#r_dir = '/nfshomes/dakelley/research/error_correction/bin'
+quake_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
 
 ############################################################
 # main
@@ -26,8 +27,9 @@ def main():
     parser.add_option('--no_count', dest='no_count', action='store_true', default=False, help='Kmers are already counted and in expected file [reads file].qcts or [reads file].cts [default: %default]')
     parser.add_option('--no_cut', dest='no_cut', action='store_true', default=False, help='Coverage model is optimized and cutoff was printed to expected file cutoff.txt [default: %default]')
     parser.add_option('--int', dest='counted_kmers', action='store_true', default=False, help='Kmers were counted as integers w/o the use of quality values [default: %default]')
-    parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help='IGNORE: Model kmer coverage as a function of GC content of kmers [default: %default]')
     parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff.  Generally set between 10-1000 with lower numbers suggesting a lower threshold. [default: %default]')
+    # help='Model kmer coverage as a function of GC content of kmers [default: %default]'
+    parser.add_option('--gc', dest='model_gc', action='store_true', default=False, help=SUPPRESS_HELP)
     (options, args) = parser.parse_args()
 
     if not options.readsf and not options.reads_listf:
@@ -64,13 +66,13 @@ def main():
 
     if options.model_gc:
         # run correct C++ code
-        os.system('correct %s -k %d -m %s -a cutoffs.gc.txt -p %d -q %d' % (reads_str, options.k, ctsf, options.proc, options.quality_scale))
+        os.system('%s/correct %s -k %d -m %s -a cutoffs.gc.txt -p %d -q %d' % (quake_dir,reads_str, options.k, ctsf, options.proc, options.quality_scale))
 
     else:
         cutoff = open('cutoff.txt').readline().rstrip()
 
         # run correct C++ code
-        os.system('correct %s -k %d -m %s -c %s -p %d -q %d' % (reads_str, options.k, ctsf, cutoff, options.proc, options.quality_scale))
+        os.system('%s/correct %s -k %d -m %s -c %s -p %d -q %d' % (quake_dir,reads_str, options.k, ctsf, cutoff, options.proc, options.quality_scale))
 
 
 ################################################################################
@@ -119,7 +121,7 @@ def count_kmers(readsf, reads_listf, k, ctsf, quality_scale):
             for fqf in line.split():
                 fq_files.append(fqf)
 
-    os.system('cat %s | count-%smers -k %d -q %d > %s' % (' '.join(fq_files), ctsf[-4], k, quality_scale, ctsf))
+    os.system('cat %s | %s/count-%smers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, ctsf[-4], k, quality_scale, ctsf))
     
             
 ############################################################

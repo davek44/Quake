@@ -26,7 +26,7 @@ static void CountMers (const string & s, const string & q, qmer_hash & mer_table
 ////////////////////////////////////////////////////////////////////////////////
 int quality_scale = -1;
 unsigned long long table_size = 0;
-unsigned int count_max = 0;
+unsigned int count_max = 500;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Usage
@@ -181,7 +181,7 @@ int  main (int argc, char * argv [])
 
   if(table_size == 0) {
        // guess based on k
-       table_size = 5 * ((unsigned long long)pow(4, Kmer_Len) / 200);
+       table_size = 30 * ((unsigned long long)pow(4, Kmer_Len) / 200);
   }
 
   // limit usurps table size
@@ -197,6 +197,8 @@ int  main (int argc, char * argv [])
   while(size2 < table_size)
        size2 <<= 1;
   size2 >>= 1;
+
+  cerr << "Table size: " << size2 << endl;
 
   qmer_hash mer_table(size2, Kmer_Len, count_max);
 
