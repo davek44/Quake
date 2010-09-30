@@ -15,7 +15,7 @@ import os, random, quake
 def main():
     usage = 'usage: %prog [options] <counts file>'
     parser = OptionParser(usage)
-    parser.add_option('--int', dest='counted_kmers', action='store_true', default=False, help='Kmers were counted as integers w/o the use of quality values [default: %default]')
+    parser.add_option('--int', dest='count_kmers', action='store_true', default=False, help='Kmers were counted as integers w/o the use of quality values [default: %default]')
     parser.add_option('--ratio', dest='ratio', type='int', default=1000, help='Likelihood ratio to set trusted/untrusted cutoff [default: %default]')
     parser.add_option('--no_sample', dest='no_sample', action='store_true', default=False, help='Do not sample kmer coverages into kmers.txt because its already done [default: %default]')
     # help='Model kmer coverage as a function of GC content of kmers [default: %default]'
@@ -27,7 +27,7 @@ def main():
     else:
         ctsf = args[0]
 
-    if options.counted_kmers:
+    if options.count_kmers:
         model_cutoff(ctsf, options.ratio)
         print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
         

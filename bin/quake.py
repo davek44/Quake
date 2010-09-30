@@ -121,7 +121,10 @@ def count_kmers(readsf, reads_listf, k, ctsf, quality_scale):
             for fqf in line.split():
                 fq_files.append(fqf)
 
-    os.system('cat %s | %s/count-%smers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, ctsf[-4], k, quality_scale, ctsf))
+    if ctsf[-4:] == 'qcts':
+        os.system('cat %s | %s/count-qmers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, k, quality_scale, ctsf))
+    else:
+        os.system('cat %s | %s/count-kmers -k %d > %s' % (' '.join(fq_files), quake_dir, k, ctsf))
     
             
 ############################################################

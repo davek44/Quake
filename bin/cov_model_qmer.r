@@ -12,6 +12,10 @@
 #
 # Finally, output the ratio of being an error kmer vs being
 # a non-error kmer for varying levels of low coverage.
+#
+# Because there is a lot of variation between each integer
+# that isn't very gamma-like, I discretize the distribution
+# during the optimization.
 ############################################################
 library(VGAM)
 
@@ -66,10 +70,10 @@ cov.est = est.cov(cov)
 # filter extremes from kmers
 cov = cov[cov < 1.25*max.copy*cov.est]
 max.cov = max(cov)
+max.cov.discrete = ceiling(max.cov)
 
 # add epsilon to zeroes
 cov[cov == 0] = 1e-12
-
 
 ############################################################
 # model 
@@ -91,7 +95,9 @@ model = function(params) {
   kmers.probs = matrix(0, nrow=length(cov), ncol=(max.copy+1))
 
   # error
-  kmers.probs[,1] = p.e * dgamma(cov, shape=shape.e, scale=scale.e)
+  dgamma.discrete = pgamma(1:max.cov.discrete, shape=shape.e, scale=scale.e) - pgamma(0:(max.cov.discrete-1), shape=shape.e, scale=scale.e)
+  kmers.probs[,1] = p.e * dgamma.discrete[ceiling(cov)]
+  #kmers.probs[,1] = p.e * dgamma(cov, shape=shape.e, scale=scale.e)
 
   # no error
   for(copy in 1:max.copy) {
