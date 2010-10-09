@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <string.h>
+#include <cstring>
 #include <getopt.h>
 #include <omp.h>
 #include <cstdlib>
@@ -69,7 +70,7 @@ static bool out_log = false;
 
 // constants
 #define TESTING false
-static const char* nts = "ACGTN";
+static char* nts = "ACGTN";
 static const unsigned int max_qual = 50;
 //unsigned int chunks_per_thread = 200;
 

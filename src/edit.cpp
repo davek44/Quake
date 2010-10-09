@@ -3,6 +3,7 @@
 #include <omp.h>
 #include <iostream>
 #include <sstream>
+#include <cstring>
 #include <gzstream.h>
 #include "Read.h"
 

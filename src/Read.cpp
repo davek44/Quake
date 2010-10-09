@@ -137,8 +137,8 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
 
   unsigned int max_queue_size = 400000;
 
-  /*
-  if(header == "@1") {
+/*
+  if(header == "@read_75408") {
     cout << "Untrusted: " << untrusted_subset.size() << endl;
     for(int i = 0; i < untrusted_subset.size(); i++)
       cout << untrusted_subset[i] << " ";
@@ -148,7 +148,7 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
       cout << region[i] << " ";
     cout << endl << endl;
   } 
-  */ 
+*/ 
 
   ////////////////////////////////////////
   // region
@@ -339,8 +339,8 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
       }
     }
 
-    /*
-    if(header == "@1") {
+    /*   
+    if(header == "@read_75408") {
       cout << cr->likelihood << "\t";
       for(int c = 0; c < cr->corrections.size(); c++) {
 	cout << " (" << cr->corrections[c].index << "," << cr->corrections[c].to << ")";

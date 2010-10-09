@@ -1,8 +1,10 @@
-#include  <string>
-#include  <vector>
-#include  <iostream>
+#include <string>
+#include <cstring>
+#include <vector>
+#include <iostream>
+#include <stdio.h>
 #include <getopt.h>
-#include  "count.h"
+#include "count.h"
 
 using namespace std;
 using namespace HASHMAP;

@@ -1,5 +1,9 @@
-#include "qmer_hash.h"
 #include <iostream>
+#include <stdio.h>
+#include <cstdlib>
+#include <string.h>
+#include "qmer_hash.h"
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // qmer_hash

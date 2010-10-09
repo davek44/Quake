@@ -31,7 +31,7 @@ static int trim_t = 30;
 //int threads;
 
 // constants
-static const char* nts = "ACGTN";
+static char* nts = "ACGTN";
 
 //unsigned int chunks_per_thread;
 
