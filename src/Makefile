@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-g -fopenmp -I/fs/szannotation/src/boost_1_42_0 -I.
+CFLAGS=-O3 -fopenmp -I/fs/szannotation/src/boost_1_42_0 -I.
 LDFLAGS=-L. -lgzstream -lz
 #INCLUDEDIR=
 EXE_FILES = correct count-kmers count-qmers count_qmers reduce-kmers reduce-qmers trim build_bithash correct_stats
