@@ -92,8 +92,8 @@ void MerToAscii(Mer_t mer, string & s)
 //  off the left end of  mer .
 void  Forward_Add_Ch(Mer_t & mer, char ch)
 {
-  mer &= Forward_Mask;
   mer <<= 2;
+  mer &= Forward_Mask;
   mer |= Char_To_Binary (ch);
 }
 

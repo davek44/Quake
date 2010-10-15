@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <string.h>
+#include <count.h>
 #include "qmer_hash.h"
 
 
@@ -84,6 +85,17 @@ void qmer_hash::add(unsigned long long kmer, float q) {
 bool qmer_hash::compare_entry(unsigned long long kmer, unsigned long long entry) {
      // get kmer from entry
      unsigned long long entry_kmer = entry >> (64 - 2*k);
+/*
+     char* kmer_char = new char[k+1];
+     kmer_char[k] = '\0';
+     ull_to_char(kmer_char, kmer);
+     string kmer_string = ull_to_binstr(kmer);
+
+     char* entry_kmer_char = new char[k+1];
+     kmer_char[k] = '\0';
+     ull_to_char(entry_kmer_char, entry_kmer);
+     string entry_kmer_string = ull_to_binstr(entry_kmer);
+*/
      return (entry_kmer == kmer);
 }
 
