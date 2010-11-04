@@ -530,19 +530,22 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 	  nti = strchr(nts, ntseq[i]);	
 	  iseq.push_back(nti - nts);
 	}
-	
+		
+	// get quality values
+	getline(reads_in,mid);
+	//cout << mid << endl;
+	getline(reads_in,strqual);
+	//cout << strqual << endl;
+
+	if(iseq.size() < trim_t)
+	     continue;
+
 	vector<int> untrusted;
 	for(int i = 0; i < iseq.size()-k+1; i++) {
 	  if(!trusted->check(&iseq[i])) {
 	    untrusted.push_back(i);
 	  }
 	}
-	
-	// get quality values
-	getline(reads_in,mid);
-	//cout << mid << endl;
-	getline(reads_in,strqual);
-	//cout << strqual << endl;
 
 	trim_length = quick_trim(strqual, untrusted);
 	
@@ -641,19 +644,22 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 	  nti = strchr(nts, ntseq[i]);
 	  iseq.push_back(nti - nts);
 	}
-	
+		
+	// get quality values
+	getline(reads_in,strqual);
+	//cout << strqual << endl;
+	getline(reads_in,strqual);
+	//cout << strqual << endl;
+
+	if(iseq.size() < trim_t)
+	     continue;
+
 	vector<int> untrusted;
 	for(int i = 0; i < iseq.size()-k+1; i++) {
 	  if(!trusted->check(&iseq[i])) {
 	    untrusted.push_back(i);
 	  }
 	}
-	
-	// get quality values
-	getline(reads_in,strqual);
-	//cout << strqual << endl;
-	getline(reads_in,strqual);
-	//cout << strqual << endl;
 
 	trim_length = quick_trim(strqual, untrusted);
 
