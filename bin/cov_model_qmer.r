@@ -57,6 +57,11 @@ est.cov = function(d) {
     }
     i = i + 1
   }
+
+  if(max.cov / valley < 2) {
+    stop("Cannot identify reliable trusted k-mer coverage peak. Please verify the integrity of your dataset (e.g. by running kmer_hist.r). If there is no clear trusted k-mer distribution, the coverage is too low to correct these reads. If there is, please e-mail dakelley@umiacs.umd.edu and choose the cutoff by hand in the meantime")
+  }
+    
   return( max.cov )
 }
 
