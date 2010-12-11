@@ -142,7 +142,7 @@ void bithash::tab_file_load(istream & mer_in, const double boundary, unsigned lo
   double count;
 
   while(getline(mer_in, line)) {
-    if(line[k] != '\t') {
+    if(line[k] != ' ' && line[k] != '\t') {
       cerr << "Kmers are not of expected length " << k << endl;
       exit(EXIT_FAILURE);
     }
