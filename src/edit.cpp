@@ -303,7 +303,7 @@ void combine_output_paired_stream(string fqf1, string fqf2, ostream & pair_out1,
 
 	// get read2
 	if(!getline(tc_out2, header2)) {
-	  cerr << "Uneven number of reads in paired end read files " << fqf1 << " and " << fqf2 << endl;
+	  cerr << "Uneven number of reads in paired end read files " << tc_file1.c_str() << " and " << tc_file2.c_str() << endl;
 	  exit(EXIT_FAILURE);
 	}	
 	getline(tc_out2, seq2);
