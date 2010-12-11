@@ -137,8 +137,8 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
 
   unsigned int max_queue_size = 400000;
 
-/*
-  if(header == "@read_75408") {
+  /*
+  if(header == "@read3") {
     cout << "Untrusted: " << untrusted_subset.size() << endl;
     for(int i = 0; i < untrusted_subset.size(); i++)
       cout << untrusted_subset[i] << " ";
@@ -148,7 +148,7 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
       cout << region[i] << " ";
     cout << endl << endl;
   } 
-*/ 
+  */
 
   ////////////////////////////////////////
   // region
@@ -230,8 +230,13 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
   short edit_i;
   float like;
   bitset<bitsize> bituntrusted;
-  for(int i = 0; i < untrusted_subset.size(); i++)
-    bituntrusted.set(untrusted_subset[i]);
+  for(int i = 0; i < untrusted_subset.size(); i++) {
+       if(untrusted_subset[i] >= bitsize) {
+	    cerr << "These reads must be longer than assumed. Increase the variable 'bitsize' in 'Read.h' to the read length." << endl;
+	    exit(1);
+       } else
+	    bituntrusted.set(untrusted_subset[i]);
+  }
 
   bool cr_added = true;  // once an iteration passes w/ no corrected reads added, we can stop
   for(short region_edit = 0; region_edit < region.size() && cr_added; region_edit++) {
@@ -339,8 +344,8 @@ int Read::correct_cc(vector<short> region, vector<int> untrusted_subset, bithash
       }
     }
 
-    /*   
-    if(header == "@read_75408") {
+    /*
+    if(header == "@read3") {
       cout << cr->likelihood << "\t";
       for(int c = 0; c < cr->corrections.size(); c++) {
 	cout << " (" << cr->corrections[c].index << "," << cr->corrections[c].to << ")";

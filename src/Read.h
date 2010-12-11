@@ -10,7 +10,7 @@
 using namespace::std;
 
 //const int bitsize = 22;
-const int bitsize = 110;
+const int bitsize = 135;
 
 ////////////////////////////////////////////////////////////
 // correction
