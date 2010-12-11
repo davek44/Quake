@@ -102,7 +102,8 @@ static void parse_command_line(int argc, char **argv) {
       cerr << "Kmer length must be <= 31" << endl;
       exit(1);
     }
-  Forward_Mask = ((long long unsigned) 1 << (2 * Kmer_Len - 2)) - 1;
+  //Forward_Mask = ((long long unsigned) 1 << (2 * Kmer_Len - 2)) - 1;
+  Forward_Mask = ((long long unsigned) 1 << (2 * Kmer_Len)) - 1;
 }
 
 //////////////////////////////////////////////////////////////////////
