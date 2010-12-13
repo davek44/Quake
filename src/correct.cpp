@@ -537,17 +537,19 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 	getline(reads_in,strqual);
 	//cout << strqual << endl;
 
-	if(iseq.size() < trim_t)
-	     continue;
-
 	vector<int> untrusted;
-	for(int i = 0; i < iseq.size()-k+1; i++) {
-	  if(!trusted->check(&iseq[i])) {
-	    untrusted.push_back(i);
-	  }
-	}
 
-	trim_length = quick_trim(strqual, untrusted);
+	if(iseq.size() < trim_t)
+	     trim_length = 0;
+	else {
+	     for(int i = 0; i < iseq.size()-k+1; i++) {
+		  if(!trusted->check(&iseq[i])) {
+		       untrusted.push_back(i);
+		  }
+	     }
+	     
+	     trim_length = quick_trim(strqual, untrusted);
+	}
 	
 	// fix error reads
 	if(untrusted.size() > 0) {
