@@ -66,6 +66,8 @@ static bool uncorrected_out = false;
 // --log, output correction log
 static bool out_log = false;
 
+static bool overwrite_temp = true;
+
 // Note: to not trim, set trimq=0 and trim_t>read_length-k
 
 // constants
@@ -475,9 +477,17 @@ static void output_read(ofstream & reads_out, ofstream & corlog_out, int pe_code
 ////////////////////////////////////////////////////////////////////////////////
 static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
   // output directory
+  struct stat st_file_info;
   string path_suffix = split(fqf,'/').back();
   string out_dir("."+path_suffix);
-  mkdir(out_dir.c_str(), S_IRWXU);
+  if(stat(out_dir.c_str(), &st_file_info) == 0) {
+    cerr << "Hidden temporary directory " << out_dir << " already exists and will be used" << endl;
+  } else {
+    if(mkdir(out_dir.c_str(), S_IRWXU) == -1) {
+      cerr << "Failed to create hidden temporary directory " << out_dir << endl;
+      exit(EXIT_FAILURE);
+    }
+  }
 
   // collect stats
   stats * thread_stats = new stats[omp_get_max_threads()];
@@ -507,76 +517,80 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
       stringstream tconvert;
       tconvert << tchunk;
       toutf += tconvert.str();
-      ofstream reads_out(toutf.c_str());
 
-      // output log
-      string tlogf = toutf + ".log";
-      ofstream corlog_out;
-      if(out_log) {
-	corlog_out.open(tlogf.c_str());
-      }
+      if(overwrite_temp || stat(toutf.c_str(), &st_file_info) == -1) {
+	ofstream reads_out(toutf.c_str());
+	cout << toutf << endl;
 
-      unsigned long long tcount = 0;
-      while(getline(reads_in, header)) {
-	//cout << tid << " " << header << endl;
-	
-	// get sequence
-	getline(reads_in, ntseq);
-	//cout << ntseq << endl;
-	
-	// convert ntseq to iseq
-	vector<unsigned int> iseq;
-	for(int i = 0; i < ntseq.size(); i++) {
-	  nti = strchr(nts, ntseq[i]);	
-	  iseq.push_back(nti - nts);
+	// output log
+	string tlogf = toutf + ".log";
+	ofstream corlog_out;
+	if(out_log) {
+	  corlog_out.open(tlogf.c_str());
 	}
-		
-	// get quality values
-	getline(reads_in,mid);
-	//cout << mid << endl;
-	getline(reads_in,strqual);
-	//cout << strqual << endl;
 
-	vector<int> untrusted;
-
-	if(iseq.size() < trim_t)
-	     trim_length = 0;
-	else {
-	     for(int i = 0; i < iseq.size()-k+1; i++) {
-		  if(!trusted->check(&iseq[i])) {
-		       untrusted.push_back(i);
-		  }
-	     }
-	     
-	     trim_length = quick_trim(strqual, untrusted);
-	}
+	unsigned long long tcount = 0;
+	while(getline(reads_in, header)) {
+	  //cout << tid << " " << header << endl;
 	
-	// fix error reads
-	if(untrusted.size() > 0) {
-	  r = new Read(header, &iseq[0], strqual, untrusted, trim_length);
-	  corseq = r->correct(trusted, ntnt_prob, prior_prob);
+	  // get sequence
+	  getline(reads_in, ntseq);
+	  //cout << ntseq << endl;
+	
+	  // convert ntseq to iseq
+	  vector<unsigned int> iseq;
+	  for(int i = 0; i < ntseq.size(); i++) {
+	    nti = strchr(nts, ntseq[i]);	
+	    iseq.push_back(nti - nts);
+	  }
 
-	  // output read w/ trim and corrections
-	  output_read(reads_out, corlog_out, pe_code, header, ntseq, mid, strqual, corseq, thread_stats[tid]);
+	  // get quality values
+	  getline(reads_in,mid);
+	  //cout << mid << endl;
+	  getline(reads_in,strqual);
+	  //cout << strqual << endl;
+
+	  vector<int> untrusted;
+
+	  if(iseq.size() < trim_t)
+	    trim_length = 0;
+	  else {
+	    for(int i = 0; i < iseq.size()-k+1; i++) {
+	      if(!trusted->check(&iseq[i])) {
+		untrusted.push_back(i);
+	      }
+	    }
+
+	    trim_length = quick_trim(strqual, untrusted);
+	  }
+
+	  // fix error reads
+	  if(untrusted.size() > 0) {
+	    r = new Read(header, &iseq[0], strqual, untrusted, trim_length);
+	    corseq = r->correct(trusted, ntnt_prob, prior_prob);
+
+	    // output read w/ trim and corrections
+	    output_read(reads_out, corlog_out, pe_code, header, ntseq, mid, strqual, corseq, thread_stats[tid]);
 	  
-	  delete r;
-	} else {
-	  output_read(reads_out, corlog_out, pe_code, header, ntseq, mid, strqual, ntseq.substr(0,trim_length), thread_stats[tid]);
-	  // output read as trimmed
-	  /*
-	  if(contrail_out)
-	    reads_out << header << "\t" << ntseq.substr(0,trim_length) << endl;
-	  else
-	    reads_out << header << endl << ntseq.substr(0,trim_length) << endl << mid << endl << strqual.substr(0,trim_length) << endl;
-	  */
-	}
+	    delete r;
+	  } else {
+	    output_read(reads_out, corlog_out, pe_code, header, ntseq, mid, strqual, ntseq.substr(0,trim_length), thread_stats[tid]);
+	    // output read as trimmed
+	    /*
+	      if(contrail_out)
+	      reads_out << header << "\t" << ntseq.substr(0,trim_length) << endl;
+	      else
+	      reads_out << header << endl << ntseq.substr(0,trim_length) << endl << mid << endl << strqual.substr(0,trim_length) << endl;
+	    */
+	  }
 	
-	if(++tcount == counts[tchunk])
-	  break;
+	  if(++tcount == counts[tchunk])
+	    break;
+	}
+	reads_out.close();
       }
-      reads_out.close();
 
-      #pragma omp critical
+#pragma omp critical
       tchunk = chunk++;
     }
     reads_in.close();
@@ -653,17 +667,19 @@ static void learn_errors(string fqf, bithash * trusted, vector<streampos> & star
 	getline(reads_in,strqual);
 	//cout << strqual << endl;
 
-	if(iseq.size() < trim_t)
-	     continue;
-
 	vector<int> untrusted;
-	for(int i = 0; i < iseq.size()-k+1; i++) {
-	  if(!trusted->check(&iseq[i])) {
-	    untrusted.push_back(i);
-	  }
-	}
 
-	trim_length = quick_trim(strqual, untrusted);
+	if(iseq.size() < trim_t)
+	  trim_length = 0;
+	else {
+	  for(int i = 0; i < iseq.size()-k+1; i++) {
+	    if(!trusted->check(&iseq[i])) {
+	      untrusted.push_back(i);
+	    }
+	  }
+	  
+	  trim_length = quick_trim(strqual, untrusted);
+	}
 
 	// fix error reads
 	if(untrusted.size() > 0) {
