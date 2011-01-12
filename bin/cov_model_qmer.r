@@ -23,7 +23,7 @@ library(VGAM)
 if(length(commandArgs(trailingOnly=TRUE)) > 0) {
   ratio.goal = as.integer(commandArgs(trailingOnly=TRUE)[1])
 } else {
-  ratio.goal = 10
+  ratio.goal = 200
 }
 
 outf = "cutoff.txt"
