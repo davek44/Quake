@@ -520,7 +520,7 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 
       if(overwrite_temp || stat(toutf.c_str(), &st_file_info) == -1) {
 	ofstream reads_out(toutf.c_str());
-	cout << toutf << endl;
+	//cout << toutf << endl;
 
 	// output log
 	string tlogf = toutf + ".log";
