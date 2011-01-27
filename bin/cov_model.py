@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from optparse import OptionParser, SUPPRESS_HELP
-import os, random, quake
+import os, random, sys, subprocess
+import quake
 
 ############################################################
 # cov_model.py
@@ -36,7 +37,11 @@ def main():
             model_q_gc_cutoffs(ctsf, 25000, options.ratio)
         else:
             model_q_cutoff(ctsf, 50000, options.ratio, options.no_sample)
-            print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
+            if os.path.isfile('cutoff.txt'):
+                print 'Cutoff: %s' % open('cutoff.txt').readline().rstrip()
+            else:
+                print >> sys.stderr, 'Optimization of distribution likelihood function to choose k-mer cutoff failed. Inspect the k-mer counts for a clear separation of the error and true k-mer distributions.'
+                exit(1)
 
 
 ############################################################
@@ -63,7 +68,8 @@ def model_cutoff(ctsf, ratio):
             print >> cov_out, '%d\t%d' % (cov+1,kmer_hist[cov])
     cov_out.close()
 
-    os.system('R --slave --args %d < %s/cov_model.r 2> r.log' % (ratio,quake.quake_dir))
+    p = subprocess.Popen('R --slave --args %d < %s/cov_model.r 2> r.log' % (ratio,quake.quake_dir), shell=True)
+    os.waitpid(p.pid,0)
 
 
 ############################################################
@@ -113,7 +119,8 @@ def model_q_cutoff(ctsf, sample, ratio, no_sample=False):
             kmer_i += 1
         out.close()
 
-    os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,quake.quake_dir))
+    p = subprocess.Popen('R --slave --args %d < %s/cov_model_qmer.r 2> r.log' % (ratio,quake.quake_dir), shell=True)
+    os.waitpid(p.pid,0)
 
 
 ############################################################
@@ -155,14 +162,19 @@ def model_q_gc_cutoffs(ctsf, sample, ratio):
                 kmer_i += 1
         out.close()
         
-        os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,quake.quake_dir,at))
+        p = subprocess.Popen('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,quake.quake_dir,at), shell=True)
+        os.waitpid(p.pid,0)
 
+        if not os.path.isfile('cutoff.txt'):
+            print >> sys.stderr, 'Optimization of distribution likelihood function to choose k-mer cutoff failed. Inspect the k-mer counts for a clear separation of the error and true k-mer distributions.'
+            exit(1)
+        
         at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
         if at in [1,k-1]:   # setting extremes to next closests
             at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
 
-        os.system('mv kmers.txt kmers.at%d.txt' % at)
-        os.system('mv cutoff.txt cutoff.at%d.txt' % at)
+        os.rename('kmers.txt', 'kmers.at%d.txt' % at)
+        os.rename('cutoff.txt', 'cutoff.at%d.txt' % at)
 
     out = open('cutoffs.gc.txt','w')
     print >> out, '\n'.join(at_cutoffs)
@@ -208,14 +220,15 @@ def model_q_gc_cutoffs_bigmem(ctsf, sample, ratio):
             print >> out, rc
         out.close()
 
-        os.system('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,quake.quake_dir,at))
+        p = subprocess.Popen('R --slave --args %d < %s/cov_model_qmer.r 2> r%d.log' % (ratio,quake.quake_dir,at), shell=True)
+        os.waitpid(p.pid,0)
 
         at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
         if at in [1,k-1]:   # setting extremes to next closests
             at_cutoffs.append( open('cutoff.txt').readline().rstrip() )
 
-        os.system('mv kmers.txt kmers.at%d.txt' % at)
-        os.system('mv cutoff.txt cutoff.at%d.txt' % at)
+        os.rename('kmers.txt', 'kmers.at%d.txt' % at)
+        os.rename('cutoff.txt', 'cutoff.at%d.txt' % at)
 
     out = open('cutoffs.gc.txt','w')
     print >> out, '\n'.join(at_cutoffs)
