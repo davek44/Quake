@@ -1,18 +1,18 @@
-Quake is a package to correct substitution sequencing errors in experiments with
-deep coverage (e.g. >20X), specifically intended for Illumina sequencing reads.
-Quake adopts the k-mer error correction framework, first introduced by the EULER
-genome assembly package.  Unlike EULER and similar progams, Quake utilizes a
-robust mixture model of erroneous and genuine k-mer distributions to determine
-where errors are located and uses read quality values and learns the nucleotide
-to nucleotide error rates to determine what types of errors are most likely.
-This leads to more corrections and greater accuracy, especially with respect to
-avoiding mis-corrections, which create false sequence unsimilar to anything in
-the original genome sequence from which the read was taken.
+Quake is a package to correct substitution sequencing errors in experiments with deep
+coverage (e.g. >15X), specifically intended for Illumina sequencing reads.  Quake
+adopts the k-mer error correction framework, first introduced by the EULER genome
+assembly package.  Unlike EULER and similar programs, Quake utilizes a robust mixture
+model of erroneous and genuine k-mer distributions to determine where errors are
+located. Then Quake uses read quality values and learns the nucleotide to nucleotide
+error rates to determine what types of errors are most likely. This leads to more
+corrections and greater accuracy, especially with respect to avoiding
+mis-corrections, which create false sequence dissimilar to anything in the original
+genome sequence from which the read was taken.
 
-Quake is freely available from http://www.cbcb.umd.edu/software/quake , and a
-manuscript is under preparation. Instructions on how to use Quake can be found
-at http://www.cbcb.umd.edu/software/quake/manual.html .  Direct questions,
-concerns, and feature requests to David Kelley (dakelley@umiacs.umd.edu).
+Quake is freely available from http://www.cbcb.umd.edu/software/quake. Instructions
+on how to use Quake can be found at
+http://www.cbcb.umd.edu/software/quake/manual.html. Direct questions, concerns, and
+feature requests to David Kelley (dakelley@umiacs.umd.edu).
 
 Installation prerequisites:
 1. Download and install Boost: http://www.boost.org
@@ -22,3 +22,5 @@ CFLAGS=-O3 -fopenmp -I/opt/local/include -I.
 4. Download and install R VGAM library via R command install.packages("VGAM")
 
 Both Boost and R are easily installed via an installation helper e.g. MacPorts (http://www.macports.org) for Mac, and a command such as "sudo port install boost".
+
+To complete the installation, run the command "make" in the src/ directory.
