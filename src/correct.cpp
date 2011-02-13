@@ -73,7 +73,6 @@ static bool overwrite_temp = true;
 // constants
 #define TESTING false
 static char* nts = "ACGTN";
-static const unsigned int max_qual = 50;
 //unsigned int chunks_per_thread = 200;
 
  // to collect stats
@@ -307,26 +306,26 @@ static void parse_command_line(int argc, char **argv) {
 // Use ntnt_counts to perform nonparametric regression
 // on ntnt_prob across quality values.
 ////////////////////////////////////////////////////////////
-void regress_probs(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max_qual][4][4]) {
+void regress_probs(double ntnt_prob[Read::max_qual][4][4], unsigned int ntnt_counts[Read::max_qual][4][4]) {
   double sigma = 2.0;
   double sigma2 = pow(sigma, 2);
   
   // count # occurrences for each (quality=q,actual=a) tuple
-  unsigned int actual_counts[max_qual][4] = {0};
-  for(int q = 1; q < max_qual; q++)
+  unsigned int actual_counts[Read::max_qual][4] = {0};
+  for(int q = 1; q < Read::max_qual; q++)
     for(int i = 0; i < 4; i++)
       for(int j = 0; j < 4; j++)
 	actual_counts[q][i] += ntnt_counts[q][i][j];
 
   // regress
   double ntdsum;
-  for(int q = 1; q < max_qual; q++) {
+  for(int q = 1; q < Read::max_qual; q++) {
     for(int i = 0; i < 4; i++) {
       //ntdsum = 0;
       for(int j = 0; j < 4; j++) {
 	double pnum = 0;
 	double pden = 0;
-	for(int qr = 1; qr < max_qual; qr++) {
+	for(int qr = 1; qr < Read::max_qual; qr++) {
 	  pnum += ntnt_counts[qr][i][j] * exp(-pow((double)(qr - q), 2)/(2*sigma2));
 	  pden += actual_counts[qr][i] * exp(-pow((double)(qr - q), 2)/(2*sigma2));
 	}
@@ -347,7 +346,7 @@ void regress_probs(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[ma
 //
 // Print the error model to the file error_model.txt
 ////////////////////////////////////////////////////////////
-void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max_qual][4][4], string fqf) {
+void output_model(double ntnt_prob[Read::max_qual][4][4], unsigned int ntnt_counts[Read::max_qual][4][4], string fqf) {
   string base = split(fqf,'/').back();
 
   int suffix_index = base.rfind(".");
@@ -358,7 +357,7 @@ void output_model(double ntnt_prob[max_qual][4][4], unsigned int ntnt_counts[max
   ofstream mod_out(outf.c_str());
 
   unsigned int ntsum;
-  for(int q = 1; q < max_qual; q++) {
+  for(int q = 1; q < Read::max_qual; q++) {
     mod_out << "Quality = " << q << endl;
 
     // counts
@@ -475,7 +474,7 @@ static void output_read(ofstream & reads_out, ofstream & corlog_out, int pe_code
 // combining; if it's 2, the file is the second of a pair so print all reads
 // and then combine both 1 and 2.
 ////////////////////////////////////////////////////////////////////////////////
-static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
+static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[Read::max_qual][4][4], double prior_prob[4]) {
   // output directory
   struct stat st_file_info;
   string path_suffix = split(fqf,'/').back();
@@ -626,8 +625,8 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 // probabilities
 ////////////////////////////////////////////////////////////
 //static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double (&ntnt_prob)[4][4], double prior_prob[4]) {
-static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[max_qual][4][4], double prior_prob[4]) {
-  unsigned int ntnt_counts[max_qual][4][4] = {0};
+static void learn_errors(string fqf, bithash * trusted, vector<streampos> & starts, vector<unsigned long long> & counts, double ntnt_prob[Read::max_qual][4][4], double prior_prob[4]) {
+  unsigned int ntnt_counts[Read::max_qual][4][4] = {0};
   unsigned int samples = 0;
 
   unsigned int chunk = 0;
@@ -827,8 +826,8 @@ int main(int argc, char **argv) {
     chunkify_fastq(fqf, starts, counts);
 
     // learn nt->nt transitions
-    double ntnt_prob[max_qual][4][4] = {0};
-    for(int q = 0; q < max_qual; q++)
+    double ntnt_prob[Read::max_qual][4][4] = {0};
+    for(int q = 0; q < Read::max_qual; q++)
       for(int i = 0; i < 4; i++)
 	for(int j = 0; j < 4; j++)
 	  if(i != j)

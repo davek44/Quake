@@ -98,6 +98,7 @@ class Read {
   const static float trust_spread_t = .1;
   const static float correct_min_t = .000001;
   const static float learning_min_t = .00001;
+  const static unsigned int max_qual = 60;
   static int quality_scale;
 
  private:

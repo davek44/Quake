@@ -49,6 +49,10 @@ Read::Read(const string & h, const unsigned int* s, const string & q, vector<int
     seq[i] = s[i];
     // quality values of 0,1 lead to p < .25
     quals[i] = q[i] - quality_scale;
+    if(quals[i] >= max_qual) {
+	 cerr << "Quality value " << quals[i] << "larger than maximum allowed quality value " << max_qual << ". Increase the variable 'max_qual' in Read.h." << endl;
+	 exit(EXIT_FAILURE);
+    }	 
     prob[i] = max(.25, 1.0-pow(10.0,-(quals[i]/10.0)));
   }
   trusted_read = 0;
