@@ -524,11 +524,14 @@ string Read::correct(bithash *trusted, double ntnt_prob[][4][4], double prior_pr
       big_region = error_region(cc_untrusted[cc]);
       if(chop_region.size() == big_region.size()) {
 	// cannot correct, and nothing found so trim to untrusted
-	return print_corrected(multi_cors, cc_untrusted[cc].front());
+	if(chop_correct_code == 1)
+	  return print_corrected(multi_cors, chop_region.front());
+	else
+	  return print_corrected(multi_cors, cc_untrusted[cc].front());
 
       } else {
 	big_correct_code = correct_cc(big_region, cc_untrusted[cc], trusted, ntnt_prob, prior_prob, learning);
-	
+
 	if(big_correct_code == 1) {
 	  // ambiguous
 	  // cannot correct, but trim to region

@@ -561,6 +561,7 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 	    }
 
 	    trim_length = quick_trim(strqual, untrusted);
+	    //trim_length = iseq.size();
 	  }
 
 	  // fix error reads
