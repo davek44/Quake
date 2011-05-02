@@ -60,8 +60,10 @@ est.cov = function(d) {
 
   if(max.hist / valley < 1.5) {
     stop("Cannot identify reliable trusted k-mer coverage peak. Please verify the integrity of your dataset (e.g. by running kmer_hist.r). If there is no clear trusted k-mer distribution, the coverage is too low to correct these reads. If there is, please e-mail dakelley@umiacs.umd.edu and choose the cutoff by hand in the meantime")
-  }  
-    
+    # print("Quake is struggling to identify a reliable trusted k-mer coverage peak. Most likely you just have low coverage (i.e. < 20x), but check the model's cutoff choice carefully before proceeding")
+    #max.cov = 15
+  }
+
   return( max.cov )
 }
 
