@@ -202,9 +202,9 @@ void bithash::tab_file_load(istream & mer_in, const vector<double> boundary, uns
 
       // count gc
       if(atgc != NULL) {
-	unsigned int at = count_at(line.substr(0,k));
-	atgc[0] += at;
-	atgc[1] += (k-at);
+	unsigned int my_at = count_at(line.substr(0,k));
+	atgc[0] += my_at;
+	atgc[1] += (k-my_at);
       }
     }
   }
