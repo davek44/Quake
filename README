@@ -18,8 +18,11 @@ Installation prerequisites:
 1. Download and install Boost: http://www.boost.org
 2. Open src/Makefile and update CFLAGS to include Boost.  E.g. if you used MacPorts, it may be:
 CFLAGS=-O3 -fopenmp -I/opt/local/include -I.
-3. Download and install R: http://www.r-project.org
-4. Download and install R VGAM library via R command install.packages("VGAM")
+3. Compile Quake by typing "make" in the src directory.
+4. Download and install Jellyfish: http://www.cbcb.umd.edu/software/jellyfish
+5. Place a symbolic link to the jellyfish binary in Quake's bin directory, or update the variable "jellyfish_dir" in bin/quake.py to the directory containing the jellyfish binary.
+6. Download and install R: http://www.r-project.org
+7. Download and install R VGAM library via R command install.packages("VGAM")
 
 Both Boost and R are easily installed via an installation helper e.g. MacPorts (http://www.macports.org) for Mac, and a command such as "sudo port install boost".
 

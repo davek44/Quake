@@ -10,8 +10,8 @@ import cov_model
 # Launch full pipeline to correct errors
 ################################################################################
 
-#r_dir = '/nfshomes/dakelley/research/error_correction/bin'
 quake_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+jellyfish_dir = quake_dir
 
 ################################################################################
 # main
@@ -95,15 +95,21 @@ def main():
     # model coverage
     ############################################
     if not options.no_cut:
+        # clear file
+        if os.path.isfile('cutoff.txt'):
+            os.remove('cutoff.txt')
+
         if options.count_kmers:
             cov_model.model_cutoff(ctsf, options.ratio)
         else:
             if options.model_gc:
                 cov_model.model_q_gc_cutoffs(ctsf, 15000, options.ratio)
             else:
-                cov_model.model_q_cutoff(ctsf, 30000, options.ratio)
+                # clear file
+                if os.path.isfile('kmers.txt'):
+                    os.remove('kmers.txt')
 
-    exit(1)
+                cov_model.model_q_cutoff(ctsf, 30000, options.ratio)
 
     ############################################
     # correct reads
@@ -204,7 +210,7 @@ def guess_quality_scale(readsf, reads_listf):
 ################################################################################
 def jellyfish(readsf, reads_listf, k, ctsf, quality_scale, hash_size, proc):
     # choose parameters
-    table_expansion_factor = 10
+    table_expansion_factor = 20
     if not hash_size:
         # guess at table size
         hash_size = int(table_expansion_factor*math.pow(4,k) / 200)
@@ -226,10 +232,9 @@ def jellyfish(readsf, reads_listf, k, ctsf, quality_scale, hash_size, proc):
 
     # count
     if ctsf[-4:] == 'qcts':
-        print '%s/jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (quake_dir, quality_scale, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files))
-        p = subprocess.Popen('%s/jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (quake_dir, quality_scale, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
+        p = subprocess.Popen('%s/jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (jellyfish_dir, quality_scale, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
     else:
-        p = subprocess.Popen('%s/jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (quake_dir, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
+        p = subprocess.Popen('%s/jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (jellyfish_dir, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
     os.waitpid(p.pid, 0)
 
     # merge
@@ -244,19 +249,19 @@ def jellyfish(readsf, reads_listf, k, ctsf, quality_scale, hash_size, proc):
             hash_size *= max_db
 
             # merge db
-            p = subprocess.Popen('%s/jellyfish qmerge -s %d -m %d -o %s.dbm %s' % (quake_dir, hash_size, k, output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
+            p = subprocess.Popen('%s/jellyfish qmerge -s %d -m %d -o %s.dbm %s' % (jellyfish_dir, hash_size, k, output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
             os.waitpid(p.pid, 0)
 
         else:
             # merge db
-            p = subprocess.Popen('%s/jellyfish merge -o %s.dbm %s' % (quake_dir, output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
+            p = subprocess.Popen('%s/jellyfish merge -o %s.dbm %s' % (jellyfish_dir, output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
             os.waitpid(p.pid, 0)
 
     # produce actual counts
     if ctsf[-4:] == 'qcts':
-        p = subprocess.Popen('%s/jellyfish qdump -c %s.dbm > %s' % (quake_dir, output_pre, ctsf), shell=True)
+        p = subprocess.Popen('%s/jellyfish qdump -c %s.dbm > %s' % (jellyfish_dir, output_pre, ctsf), shell=True)
     else:
-        p = subprocess.Popen('%s/jellyfish stats -c %s.dbm > %s' % (quake_dir, output_pre, ctsf), shell=True)
+        p = subprocess.Popen('%s/jellyfish stats -c %s.dbm > %s' % (jellyfish_dir, output_pre, ctsf), shell=True)
     os.waitpid(p.pid, 0)
 
 
