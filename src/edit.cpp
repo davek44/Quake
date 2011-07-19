@@ -227,8 +227,14 @@ void combine_output(string fqf, string mid_ext, bool uncorrected_out) {
 
   // format output file
   int suffix_index = fqf.rfind(".");
-  string prefix = fqf.substr(0,suffix_index+1);
-  string suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
+  string prefix, suffix;
+  if(suffix_index == -1) {
+    prefix = fqf+".";
+    suffix = "";
+  } else {
+    prefix = fqf.substr(0,suffix_index+1);
+    suffix = fqf.substr(suffix_index, fqf.size()-suffix_index);
+  }
 
   string outf;
   string errf;
@@ -359,11 +365,18 @@ void combine_output_paired_stream(string fqf1, string fqf2, ostream & pair_out1,
 // Combine output files in 'out_dir' into a single file and remove 'out_dir'
 ////////////////////////////////////////////////////////////////////////////////
 void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorrected_out) {
+  string prefix, suffix;
+
   if(zip_output) {
     // format output pair file1
     int suffix_index = fqf1.rfind(".");
-    string prefix = fqf1.substr(0,suffix_index+1);
-    string suffix = fqf1.substr(suffix_index, fqf1.size()-suffix_index);
+    if(suffix_index == -1) {
+      prefix = fqf1+".";
+      suffix = "";
+    } else {
+      prefix = fqf1.substr(0,suffix_index+1);
+      suffix = fqf1.substr(suffix_index, fqf1.size()-suffix_index);
+    }
     string outf = prefix + mid_ext + suffix + ".gz";
     ogzstream pair_out1(outf.c_str());
 	      
@@ -383,8 +396,13 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     
     // format output pair file2
     suffix_index = fqf2.rfind(".");
-    prefix = fqf2.substr(0,suffix_index+1);
-    suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
+    if(suffix_index == -1) {
+      prefix = fqf2+".";
+      suffix = "";
+    } else {
+      prefix = fqf2.substr(0,suffix_index+1);
+      suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
+    }
     outf = prefix + mid_ext + suffix + ".gz";
     ogzstream pair_out2(outf.c_str());
 
@@ -412,8 +430,13 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
   } else {
     // format output pair file1
     int suffix_index = fqf1.rfind(".");
-    string prefix = fqf1.substr(0,suffix_index+1);
-    string suffix = fqf1.substr(suffix_index, fqf1.size()-suffix_index);
+    if(suffix_index == -1) {
+      prefix = fqf1+".";
+      suffix = "";
+    } else {
+      prefix = fqf1.substr(0,suffix_index+1);
+      suffix = fqf1.substr(suffix_index, fqf1.size()-suffix_index);
+    }
     string outf = prefix + mid_ext + suffix;
     ofstream pair_out1(outf.c_str());
     
@@ -433,8 +456,13 @@ void combine_output_paired(string fqf1, string fqf2, string mid_ext, bool uncorr
     
     // format output pair file2
     suffix_index = fqf2.rfind(".");
-    prefix = fqf2.substr(0,suffix_index+1);
-    suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
+    if(suffix_index == -1) {
+      prefix = fqf1+".";
+      suffix = "";
+    } else {
+      prefix = fqf2.substr(0,suffix_index+1);
+      suffix = fqf2.substr(suffix_index, fqf2.size()-suffix_index);
+    }
     outf = prefix + mid_ext + suffix;
     ofstream pair_out2(outf.c_str());
 

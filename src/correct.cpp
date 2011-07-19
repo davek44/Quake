@@ -350,9 +350,14 @@ void output_model(double ntnt_prob[Read::max_qual][4][4], unsigned int ntnt_coun
   string base = split(fqf,'/').back();
 
   int suffix_index = base.rfind(".");
-  string prefix = base.substr(0,suffix_index+1);
+  string prefix;
+  if(suffix_index == -1) {
+    prefix = base;
+  } else {
+    prefix = base.substr(0,suffix_index);
+  }
 
-  string outf = "error_model." + prefix + "txt";
+  string outf = "error_model." + prefix + ".txt";
 
   ofstream mod_out(outf.c_str());
 
@@ -607,7 +612,12 @@ static void correct_reads(string fqf, int pe_code, bithash * trusted, vector<str
 
   // print stats
   int suffix_index = fqf.rfind(".");
-  string outf = fqf.substr(0,suffix_index+1) + "stats.txt";
+  string outf;
+  if(suffix_index == -1) {
+    outf = fqf+".stats.txt";
+  } else {
+    outf = fqf.substr(0,suffix_index+1) + "stats.txt";
+  }
   ofstream stats_out(outf.c_str());
   stats_out << "Validated: " << thread_stats[0].validated << endl;
   stats_out << "Corrected: " << thread_stats[0].corrected << endl;
