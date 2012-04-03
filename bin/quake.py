@@ -251,6 +251,9 @@ def jellyfish(readsf, reads_listf, k, ctsf, quality_scale, hash_size, proc):
             # merge db
             p = subprocess.Popen('%s/jellyfish qmerge -s %d -m %d -o %s.dbm %s' % (jellyfish_dir, hash_size, k, output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
             os.waitpid(p.pid, 0)
+            
+            # rename file
+            os.rename('%s.dbm_0' % output_pre, '%s.dbm' % output_pre)
 
         else:
             # merge db
@@ -261,7 +264,7 @@ def jellyfish(readsf, reads_listf, k, ctsf, quality_scale, hash_size, proc):
     if ctsf[-4:] == 'qcts':
         p = subprocess.Popen('%s/jellyfish qdump -c %s.dbm > %s' % (jellyfish_dir, output_pre, ctsf), shell=True)
     else:
-        p = subprocess.Popen('%s/jellyfish stats -c %s.dbm > %s' % (jellyfish_dir, output_pre, ctsf), shell=True)
+        p = subprocess.Popen('%s/jellyfish dump -c %s.dbm > %s' % (jellyfish_dir, output_pre, ctsf), shell=True)
     os.waitpid(p.pid, 0)
 
 
