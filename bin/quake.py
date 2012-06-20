@@ -66,7 +66,7 @@ def main():
     if not options.k:
         parser.error('Must provide k-mer size with -k')
     elif options.k > 20:
-        print >> sys.stderr, 'k=%d is a high k-mer value and should be reserved for enormous genomes (see the FAQ on the Quake website). Nevertheless, the program will proceed assuming you have chosen well.'
+        print >> sys.stderr, 'k=%d is a high k-mer value and should be reserved for enormous genomes (see the FAQ on the Quake website). Nevertheless, the program will proceed assuming you have chosen well.' % options.k
 
     if options.count_kmers:
         cts_suf = 'cts'
