@@ -144,11 +144,28 @@ def count_kmers(readsf, reads_listf, k, ctsf, quality_scale):
             for fqf in line.split():
                 fq_files.append(fqf)
 
-    # count
-    if ctsf[-4:] == 'qcts':
-        p = subprocess.Popen('cat %s | %s/count-qmers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, k, quality_scale, ctsf), shell=True)
+    # count zipped fastq files
+    fq_zipped = [fqf[-3:] == '.gz' for fqf in fq_files]
+
+    # none ziped
+    if sum(fq_zipped) == 0:
+        if ctsf[-5:] == '.qcts':
+            p = subprocess.Popen('cat %s | %s/count-qmers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, k, quality_scale, ctsf), shell=True)
+        else:
+            p = subprocess.Popen('cat %s | %s/count-kmers -k %d > %s' % (' '.join(fq_files), quake_dir, k, ctsf), shell=True)
+
+    # all zipped
+    elif sum(fq_zipped) == len(fq_zipped):
+        if ctsf[-5:] == '.qcts':
+            p = subprocess.Popen('gunzip -c %s | %s/count-qmers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, k, quality_scale, ctsf), shell=True)
+        else:
+            p = subprocess.Popen('gunzip -c %s | %s/count-kmers -k %d > %s' % (' '.join(fq_files), quake_dir, k, ctsf), shell=True)
+
+    # mixed- boo
     else:
-        p = subprocess.Popen('cat %s | %s/count-kmers -k %d > %s' % (' '.join(fq_files), quake_dir, k, ctsf), shell=True)
+        print >> sys.stderr, 'Some fastq files are zipped, some are not. Please be consistent.'
+        exit(1)
+
     os.waitpid(p.pid, 0)
 
 
