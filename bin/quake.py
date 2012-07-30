@@ -147,7 +147,7 @@ def count_kmers(readsf, reads_listf, k, ctsf, quality_scale):
     # count zipped fastq files
     fq_zipped = [fqf[-3:] == '.gz' for fqf in fq_files]
 
-    # none ziped
+    # none zipped
     if sum(fq_zipped) == 0:
         if ctsf[-5:] == '.qcts':
             p = subprocess.Popen('cat %s | %s/count-qmers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, k, quality_scale, ctsf), shell=True)
@@ -247,11 +247,28 @@ def jellyfish(readsf, reads_listf, k, ctsf, quality_scale, hash_size, proc):
             for fqf in line.split():
                 fq_files.append(fqf)
 
-    # count
-    if ctsf[-4:] == 'qcts':
-        p = subprocess.Popen('%s/jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (jellyfish_dir, quality_scale, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
+    # count zipped fastq files
+    fq_zipped = [fqf[-3:] == '.gz' for fqf in fq_files]
+
+    # none zipped
+    if sum(fq_zipped) == 0:
+        if ctsf[-4:] == 'qcts':
+            p = subprocess.Popen('%s/jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (jellyfish_dir, quality_scale, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
+        else:
+            p = subprocess.Popen('%s/jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (jellyfish_dir, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
+
+    # all zipped
+    elif sum(fq_zipped) == len(fq_zipped):
+        if ctsf[-4:] == 'qcts':
+            p = subprocess.Popen('gunzip -c %s | %s/jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands /dev/fd/0' % (' '.join(fq_files), jellyfish_dir, quality_scale, ct_size, output_pre, k, proc, hash_size), shell=True)
+        else:
+            p = subprocess.Popen('gunzip -c %s | %s/jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands /dev/fd/0' % (' '.join(fq_files), jellyfish_dir, ct_size, output_pre, k, proc, hash_size), shell=True)
+
+    # mixed- boo
     else:
-        p = subprocess.Popen('%s/jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (jellyfish_dir, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
+        print >> sys.stderr, 'Some fastq files are zipped, some are not. Please be consistent.'
+        exit(1)
+
     os.waitpid(p.pid, 0)
 
     # merge
