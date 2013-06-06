@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <cstring>
+#include <getopt.h>
 
 #include <ext/hash_map>
 namespace Sgi = ::__gnu_cxx;         // GCC 4.0 and later

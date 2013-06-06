@@ -3,7 +3,6 @@
 #include <vector>
 #include <iostream>
 #include <stdio.h>
-#include <getopt.h>
 #include "count.h"
 
 using namespace std;

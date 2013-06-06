@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <getopt.h>
 
 //-- Include hash_map
 #ifdef __GNUC__
