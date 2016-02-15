@@ -31,7 +31,7 @@ def main():
     # Count options
     count_group = OptionGroup(parser, 'K-mer counting')
     count_group.add_option('--no_jelly', dest='no_jelly', action='store_true', default=False, help='Count k-mers using a simpler program than Jellyfish')
-    count_group.add_option('--no_count', dest='no_count', action='store_true', default=False, help='Kmers are already counted and in expected file [reads file].qcts or [reads file].cts [default: %default]')    
+    count_group.add_option('--no_count', dest='no_count', action='store_true', default=False, help='Kmers are already counted and in expected file [reads file].qcts or [reads file].cts [default: %default]')
     count_group.add_option('--int', dest='count_kmers', action='store_true', default=False, help='Count kmers as integers w/o the use of quality values [default: %default]')
     count_group.add_option('--count_only', dest='count_only', action='store_true', default=False, help=SUPPRESS_HELP)
     count_group.add_option('--hash_size', dest='hash_size', type='int', help='Jellyfish hash-size parameter. Quake will estimate using k if not given')
@@ -115,16 +115,16 @@ def main():
     # correct reads
     ############################################
     correct_options = make_cor_opts(options)
-    if options.model_gc:        
+    if options.model_gc:
         # run correct C++ code
-        p = subprocess.Popen('%s/correct %s %s -m %s -a cutoffs.gc.txt -q %d' % (quake_dir, correct_options, reads_str, ctsf, quality_scale), shell=True)
+        p = subprocess.Popen('correct %s %s -m %s -a cutoffs.gc.txt -q %d' % ( correct_options, reads_str, ctsf, quality_scale), shell=True)
         os.waitpid(p.pid, 0)
 
     else:
-        cutoff = get_cutoff()            
+        cutoff = get_cutoff()
 
         # run correct C++ code
-        p = subprocess.Popen('%s/correct %s %s -m %s -c %s -q %d' % (quake_dir, correct_options, reads_str, ctsf, cutoff, quality_scale), shell=True)
+        p = subprocess.Popen('correct %s %s -m %s -c %s -q %d' % (correct_options, reads_str, ctsf, cutoff, quality_scale), shell=True)
         os.waitpid(p.pid, 0)
 
 
@@ -150,16 +150,16 @@ def count_kmers(readsf, reads_listf, k, ctsf, quality_scale):
     # none zipped
     if sum(fq_zipped) == 0:
         if ctsf[-5:] == '.qcts':
-            p = subprocess.Popen('cat %s | %s/count-qmers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, k, quality_scale, ctsf), shell=True)
+            p = subprocess.Popen('cat %s | count-qmers -k %d -q %d > %s' % (' '.join(fq_files), k, quality_scale, ctsf), shell=True)
         else:
-            p = subprocess.Popen('cat %s | %s/count-kmers -k %d > %s' % (' '.join(fq_files), quake_dir, k, ctsf), shell=True)
+            p = subprocess.Popen('cat %s | count-kmers -k %d > %s' % (' '.join(fq_files), k, ctsf), shell=True)
 
     # all zipped
     elif sum(fq_zipped) == len(fq_zipped):
         if ctsf[-5:] == '.qcts':
-            p = subprocess.Popen('gunzip -c %s | %s/count-qmers -k %d -q %d > %s' % (' '.join(fq_files), quake_dir, k, quality_scale, ctsf), shell=True)
+            p = subprocess.Popen('gunzip -c %s | count-qmers -k %d -q %d > %s' % (' '.join(fq_files), k, quality_scale, ctsf), shell=True)
         else:
-            p = subprocess.Popen('gunzip -c %s | %s/count-kmers -k %d > %s' % (' '.join(fq_files), quake_dir, k, ctsf), shell=True)
+            p = subprocess.Popen('gunzip -c %s | count-kmers -k %d > %s' % (' '.join(fq_files),  k, ctsf), shell=True)
 
     # mixed- boo
     else:
@@ -253,16 +253,16 @@ def jellyfish(readsf, reads_listf, k, ctsf, quality_scale, hash_size, proc):
     # none zipped
     if sum(fq_zipped) == 0:
         if ctsf[-4:] == 'qcts':
-            p = subprocess.Popen('%s/jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (jellyfish_dir, quality_scale, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
+            p = subprocess.Popen('jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (quality_scale, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
         else:
-            p = subprocess.Popen('%s/jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % (jellyfish_dir, ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
+            p = subprocess.Popen('jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands %s' % ( ct_size, output_pre, k, proc, hash_size, ' '.join(fq_files)), shell=True)
 
     # all zipped
     elif sum(fq_zipped) == len(fq_zipped):
         if ctsf[-4:] == 'qcts':
-            p = subprocess.Popen('gunzip -c %s | %s/jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands /dev/fd/0' % (' '.join(fq_files), jellyfish_dir, quality_scale, ct_size, output_pre, k, proc, hash_size), shell=True)
+            p = subprocess.Popen('gunzip -c %s | jellyfish count -q --quality-start %d -c %d -o %s.db -m %d -t %d -s %d --both-strands /dev/fd/0' % (' '.join(fq_files), quality_scale, ct_size, output_pre, k, proc, hash_size), shell=True)
         else:
-            p = subprocess.Popen('gunzip -c %s | %s/jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands /dev/fd/0' % (' '.join(fq_files), jellyfish_dir, ct_size, output_pre, k, proc, hash_size), shell=True)
+            p = subprocess.Popen('gunzip -c %s | jellyfish count -c %d -o %s.db -m %d -t %d -s %d --both-strands /dev/fd/0' % (' '.join(fq_files), ct_size, output_pre, k, proc, hash_size), shell=True)
 
     # mixed- boo
     else:
@@ -283,22 +283,22 @@ def jellyfish(readsf, reads_listf, k, ctsf, quality_scale, hash_size, proc):
             hash_size *= max_db
 
             # merge db
-            p = subprocess.Popen('%s/jellyfish qmerge -s %d -m %d -o %s.dbm %s' % (jellyfish_dir, hash_size, k, output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
+            p = subprocess.Popen('jellyfish qmerge -s %d -m %d -o %s.dbm %s' % (hash_size, k, output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
             os.waitpid(p.pid, 0)
-            
+
             # rename file
             os.rename('%s.dbm_0' % output_pre, '%s.dbm' % output_pre)
 
         else:
             # merge db
-            p = subprocess.Popen('%s/jellyfish merge -o %s.dbm %s' % (jellyfish_dir, output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
+            p = subprocess.Popen('jellyfish merge -o %s.dbm %s' % (output_pre, ' '.join(['%s.db_%d' % (output_pre,i) for i in range(max_db)])), shell=True)
             os.waitpid(p.pid, 0)
 
     # produce actual counts
     if ctsf[-4:] == 'qcts':
-        p = subprocess.Popen('%s/jellyfish qdump -c %s.dbm > %s' % (jellyfish_dir, output_pre, ctsf), shell=True)
+        p = subprocess.Popen('jellyfish qdump -c %s.dbm > %s' % ( output_pre, ctsf), shell=True)
     else:
-        p = subprocess.Popen('%s/jellyfish dump -c %s.dbm > %s' % (jellyfish_dir, output_pre, ctsf), shell=True)
+        p = subprocess.Popen('jellyfish dump -c %s.dbm > %s' % ( output_pre, ctsf), shell=True)
     os.waitpid(p.pid, 0)
 
 
