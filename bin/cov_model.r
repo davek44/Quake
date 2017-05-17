@@ -33,7 +33,7 @@ max.copy = 30
 ############################################################
 est.cov = function(d) {
   hc = d[,2]
-  
+
   # find first valley (or right before it)
   valley = hc[1]
   i = 2
@@ -67,11 +67,11 @@ max.cov = max(cov[,1])
 
 
 ############################################################
-# model 
+# model
 ############################################################
 model = function(params) {
   print(params)
-  
+
   zp.copy = params[1]
   p.e = params[2]
   shape.e = params[3]
@@ -80,9 +80,9 @@ model = function(params) {
 
   if(zp.copy <= 0 | shape.e <= 0 | var.v <= 0)
     return(list(like=-Inf))
-  
-  dcopy = dzeta(1:max.copy, p=zp.copy)
-  
+
+  dcopy = dzeta(1:max.copy, zp.copy)
+
   kmers.probs = matrix(0, dim(cov)[1], ncol=(max.copy+1))
 
   # error
@@ -118,11 +118,11 @@ display.params = function(x, print) {
 # cutoffs
 ############################################################
 cutoffs = function(p) {
-  dcopy = dzeta(1:max.copy, p=p$zp.copy)
+  dcopy = dzeta(1:max.copy, p$zp.copy)
   pp = ppareto(1:(max.cov+1), 1, p$shape.e)
   derr = pp[2:(max.cov+1)] - pp[1:max.cov]
 
-  ratios = rep(0,40)  
+  ratios = rep(0,40)
   for(cov in 1:40) {
     error = p$p.e * derr[cov]
 
@@ -130,7 +130,7 @@ cutoffs = function(p) {
     for(copy in 1:max.copy) {
       no.error.list[copy] = dcopy[copy] * (1-p$p.e) * dnorm(cov, mean=(copy*p$u.v), sd=sqrt(copy*p$var.v))
     }
-    
+
     ratios[cov] = error / sum(no.error.list)
   }
   return(ratios)
@@ -154,7 +154,7 @@ display.params(opt$par, T)
 write(cutoffs(p), file=outf, append=T)
 
 max.x = 250
-dcopy = dzeta(1:max.copy, p=p$zp.copy)
+dcopy = dzeta(1:max.copy, p$zp.copy)
 pp = ppareto(1:(max.cov+1), 1, p$shape.e)
 derr = pp[2:(max.cov+1)] - pp[1:max.cov]
 
